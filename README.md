@@ -37,6 +37,15 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   keeps its last 10 samples, and a time-based position too, to compare with the rank one on real trips. The logic is
   `RouteLearning` in `ShoppingCore`; `ListService.learn(from:)` applies it when a trip ends.
 
+- **Map the store (experimental, off by default).** Turn on **Map the store** under your name, then tap
+  **Start trip** at the door. Your steps (`CMPedometer`) and the compass (device motion against magnetic north)
+  trace your walk from the door, and every check-off gets a point in metres. Steel shelving bends the compass, so
+  headings near the aisles' direction (learned on the first walk in) snap to it; an item whose spot has settled
+  snaps you back onto it when you check it off; and at **Done** the walk's end is pinned to the checkout (where
+  earlier trips ended), with the error spread back along the way. Each item's spot is the median of its last ten
+  points. The map key on the list opens the floor plan: items coloured by zone, with your last mapped walk over
+  them. Keep the app open while you shop. Only trips started at the door are mapped, and learning the store's order
+  works the same either way. It asks for Motion & Fitness access; the walk stays on the phone and in the shared list.
 - **Shared lists, live.** Tap the share key on a list to invite someone through Messages, Mail or a link. They
   tap the invitation and the list appears in their app. From then on, anything either of you adds, edits or checks
   off shows up on the other phone within seconds. On a shared list, rows say who added something ("Added by
@@ -74,8 +83,8 @@ Sharing needs two real iCloud accounts to try out: the simulator can't receive t
 
 | Path | What |
 |---|---|
-| `App/` | The SwiftUI app: `BuckFiftyApp.swift`, `AppSupport.swift` (launch arguments, profile, fetches, demo data), `Sharing.swift` (the app model, the sharing sheet, accepting invitations), `ZoneGuesser.swift` (the on-device zone guess), `Views/` |
-| `Packages/ShoppingKit` | The logic, as a Swift package: `ShoppingCore` (Foundation only: names, suggestions, list order, learning the route, zone-guess prompts, trip rules) and `ShoppingStore` (the Core Data model built in code, `Persistence` with its private and shared iCloud stores, `ListService` and `SharingService`) |
+| `App/` | The SwiftUI app: `BuckFiftyApp.swift`, `AppSupport.swift` (launch arguments, profile, fetches, demo data), `Sharing.swift` (the app model, the sharing sheet, accepting invitations), `ZoneGuesser.swift` (the on-device zone guess), `StoreMapper.swift` (dead reckoning with Core Motion), `Views/` |
+| `Packages/ShoppingKit` | The logic, as a Swift package: `ShoppingCore` (Foundation only: names, suggestions, list order, learning the route, zone-guess prompts, dead reckoning and the floor plan, trip rules) and `ShoppingStore` (the Core Data model built in code, `Persistence` with its private and shared iCloud stores, `ListService` and `SharingService`) |
 | `project.yml` | The Xcode project, for [XcodeGen](https://github.com/yonaskolb/XcodeGen) |
 | `Makefile`, `Scripts/dist.sh` | Build, run in the Simulator, install on your iPhone (see below) |
 | `Scripts/screenshots.sh` | Builds the app for the simulator, runs it on sample data and screenshots each screen |

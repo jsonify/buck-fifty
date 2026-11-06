@@ -5,7 +5,7 @@ import ShoppingCore
 import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
-/// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit or zones.
+/// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zones or map.
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }
@@ -23,6 +23,10 @@ final class Profile {
     var name: String {
         didSet { defaults.set(name, forKey: "shopperName") }
     }
+    /// Map the store from trips by dead reckoning (issue #5). Experimental, so off until turned on.
+    var mapsStore: Bool {
+        didSet { defaults.set(mapsStore, forKey: "mapsStore") }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -34,6 +38,7 @@ final class Profile {
             self.id = id
         }
         name = defaults.string(forKey: "shopperName") ?? ""
+        mapsStore = defaults.bool(forKey: "mapsStore")
     }
 
     var shopper: Shopper { Shopper(id: id, name: name.isEmpty ? "Me" : name) }
@@ -131,12 +136,34 @@ enum DemoData {
         let walked = ["AA batteries", "Paper towels", "Toilet paper", "Olive oil", "Peanut butter", "Chicken thighs",
                       "Eggs", "Greek yogurt", "Milk", "Frozen berries", "Coffee beans", "Croissants",
                       "Rotisserie chicken"]
-        for daysAgo in [14.0, 7.0] {
+        // Both trips were mapped (issue #5): where each thing was grabbed, in metres from the door, a little apart
+        // each time, and the walk through them to the checkout.
+        let spots: [String: FloorPoint] = [
+            "AA batteries": FloorPoint(x: 6, y: 10), "Paper towels": FloorPoint(x: 52, y: 8),
+            "Toilet paper": FloorPoint(x: 58, y: 10), "Olive oil": FloorPoint(x: 50, y: 36),
+            "Peanut butter": FloorPoint(x: 58, y: 42), "Chicken thighs": FloorPoint(x: 68, y: 74),
+            "Eggs": FloorPoint(x: 44, y: 86), "Greek yogurt": FloorPoint(x: 36, y: 86),
+            "Milk": FloorPoint(x: 28, y: 86), "Frozen berries": FloorPoint(x: 14, y: 74),
+            "Coffee beans": FloorPoint(x: 12, y: 56), "Croissants": FloorPoint(x: 6, y: 48),
+            "Rotisserie chicken": FloorPoint(x: 6, y: 26),
+        ]
+        costco.gridHeading = 0
+        for (tripNumber, daysAgo) in [14.0, 7.0].enumerated() {
             let start = Date().addingTimeInterval(-daysAgo * 24 * 60 * 60)
+            var walk = [FloorPoint.entrance]
             for (offset, name) in walked.enumerated() {
-                if let entry = service.addToList(name, store: costco, by: shopper, now: start) {
-                    service.setChecked(entry, true, by: shopper, now: start.addingTimeInterval(Double(offset) * 90))
-                }
+                guard let entry = service.addToList(name, store: costco, by: shopper, now: start),
+                      let checkOff = service.setChecked(entry, true, by: shopper,
+                                                        now: start.addingTimeInterval(Double(offset) * 90))
+                else { continue }
+                let wobble = Double(offset * 7 + tripNumber * 13)
+                let point = (spots[name] ?? .entrance) + FloorPoint(x: 2 * sin(wobble), y: 2 * cos(wobble * 1.3))
+                service.setPoint(point, of: checkOff)
+                walk.append(point)
+            }
+            walk.append(FloorPoint(x: 2, y: 16))
+            if let trip = service.currentTrip(at: costco, for: shopper, now: start) {
+                trip.path = FloorPlan.encode(walk)
             }
             service.finishTrip(at: costco, for: shopper, now: start.addingTimeInterval(Double(walked.count) * 90))
         }

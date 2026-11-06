@@ -176,6 +176,88 @@ final class ZoneGuessTests: XCTestCase {
     }
 }
 
+final class DeadReckoningTests: XCTestCase {
+    func assertPoint(_ p: FloorPoint?, _ x: Double, _ y: Double, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(p?.x ?? .nan, x, accuracy: 1e-6, file: file, line: line)
+        XCTAssertEqual(p?.y ?? .nan, y, accuracy: 1e-6, file: file, line: line)
+    }
+
+    func testWalkingTracesFromTheDoor() {
+        var reckoning = DeadReckoning()
+        assertPoint(reckoning.walk(10, heading: 90), 10, 0)    // east
+        assertPoint(reckoning.walk(5, heading: 0), 10, 5)      // north
+        assertPoint(reckoning.walk(0, heading: 180), 10, 5)
+    }
+
+    func testHeadingsSnapToTheAislesGrid() {
+        let reckoning = DeadReckoning(gridHeading: 30)
+        XCTAssertEqual(reckoning.walkingHeading(40), 30, accuracy: 1e-9)
+        XCTAssertEqual(reckoning.walkingHeading(125), 120, accuracy: 1e-9)
+        XCTAssertEqual(reckoning.walkingHeading(285), 300, accuracy: 1e-9)
+        XCTAssertEqual(reckoning.walkingHeading(75), 75, accuracy: 1e-9, "Halfway between aisles stays as it is")
+        XCTAssertEqual(DeadReckoning(gridHeading: 350).walkingHeading(10), 350, accuracy: 1e-9)
+        XCTAssertEqual(DeadReckoning().walkingHeading(-90), 270, accuracy: 1e-9)
+    }
+
+    func testMeanHeadingWrapsAroundNorth() {
+        let mean = DeadReckoning.meanHeading([350, 10]) ?? .nan
+        XCTAssertEqual(abs(DeadReckoning.signedDifference(mean, 0)), 0, accuracy: 1e-6)
+        XCTAssertEqual(DeadReckoning.meanHeading([80, 100]) ?? .nan, 90, accuracy: 1e-6)
+        XCTAssertNil(DeadReckoning.meanHeading([]))
+    }
+
+    func testDriftIsSpreadBackBetweenKnownPoints() {
+        let path = (0...4).map { FloorPoint(x: Double($0), y: 0) }
+        // Ended 2 m north of where it thought: the checkout is a known point.
+        let atCheckout = PathCorrection.corrected(path, anchors: [4: FloorPoint(x: 4, y: 2)])
+        XCTAssertEqual(atCheckout.map(\.y), [0, 0.5, 1, 1.5, 2])
+        XCTAssertEqual(atCheckout.map(\.x), [0, 1, 2, 3, 4])
+        // A landmark halfway: after it the correction holds.
+        let landmark = PathCorrection.corrected(path, anchors: [2: FloorPoint(x: 2, y: 1)])
+        XCTAssertEqual(landmark.map(\.y), [0, 0.5, 1, 1, 1])
+        XCTAssertEqual(PathCorrection.currentOffset(path, anchors: [2: FloorPoint(x: 2, y: 1)]), FloorPoint(x: 0, y: 1))
+        XCTAssertEqual(PathCorrection.currentOffset(path, anchors: [:]), FloorPoint(x: 0, y: 0))
+        XCTAssertEqual(PathCorrection.corrected(path, anchors: [:]), path)
+    }
+
+    func testTurningToTheGrid() {
+        let east = FloorPoint(x: 1, y: 0).rotated(toHeading: 90)
+        assertPoint(east, 0, 1)
+    }
+}
+
+final class FloorPlanTests: XCTestCase {
+    func testMedianIsRobust() {
+        XCTAssertEqual(FloorPlan.median([FloorPoint(x: 0, y: 0), FloorPoint(x: 10, y: 10), FloorPoint(x: 1, y: 1)]),
+                       FloorPoint(x: 1, y: 1))
+        XCTAssertEqual(FloorPlan.median([FloorPoint(x: 0, y: 0), FloorPoint(x: 2, y: 4)]), FloorPoint(x: 1, y: 2))
+        XCTAssertNil(FloorPlan.median([]))
+    }
+
+    func testOnlyASettledSpotIsALandmark() {
+        XCTAssertEqual(FloorPlan.landmark([FloorPoint(x: 0, y: 0), FloorPoint(x: 1, y: 0), FloorPoint(x: 0, y: 1)]),
+                       FloorPoint(x: 0, y: 0))
+        XCTAssertNil(FloorPlan.landmark([FloorPoint(x: 0, y: 0), FloorPoint(x: 20, y: 0), FloorPoint(x: 0, y: 20)]))
+        XCTAssertNil(FloorPlan.landmark([FloorPoint(x: 0, y: 0), FloorPoint(x: 0, y: 0)]), "Too few points yet")
+    }
+
+    func testThinningKeepsTheEnds() {
+        let path = [0, 0.5, 1, 2, 2.2].map { FloorPoint(x: $0, y: 0) }
+        XCTAssertEqual(FloorPlan.thinned(path).map(\.x), [0, 2, 2.2])
+        XCTAssertEqual(FloorPlan.thinned([FloorPoint.entrance]), [FloorPoint.entrance])
+        XCTAssertEqual(FloorPlan.thinned([]), [])
+    }
+
+    func testPathRoundTripsAsText() {
+        let path = [FloorPoint(x: 1.5, y: 2), FloorPoint(x: 3, y: -4)]
+        let text = FloorPlan.encode(path)
+        XCTAssertEqual(text, "1.5,2.0;3.0,-4.0")
+        XCTAssertEqual(FloorPlan.decode(text), path)
+        XCTAssertEqual(FloorPlan.decode("junk;1,2"), [FloorPoint(x: 1, y: 2)])
+        XCTAssertNil(FloorPlan.encode([]))
+    }
+}
+
 final class RouteLearningTests: XCTestCase {
     let learning = RouteLearning()
     let t0 = Date(timeIntervalSince1970: 1_000_000)
