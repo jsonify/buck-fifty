@@ -66,9 +66,9 @@ Sharing needs two real iCloud accounts to try out: the simulator can't receive t
 
 ## Building
 
-Needs Xcode 26 and XcodeGen (`brew install xcodegen`). `BuckFifty.xcodeproj` is generated from `project.yml` and isn't
+Needs Xcode 16.4 or later and XcodeGen (`brew install xcodegen`). `BuckFifty.xcodeproj` is generated from `project.yml` and isn't
 tracked in git. Every `make` target regenerates it; run `xcodegen generate` yourself before opening it in Xcode, and
-again after pulling. The app needs iOS 26 and signs with your team (`DEVELOPMENT_TEAM` in `project.yml`), as Meetball
+again after pulling. The app needs iOS 18 and signs with your team (`DEVELOPMENT_TEAM` in `project.yml`), as Meetball
 does.
 
 ### Run it without Xcode

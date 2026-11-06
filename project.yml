@@ -3,8 +3,10 @@
 name: BuckFifty
 options:
   bundleIdPrefix: com.jsonify
+  # As in Meetball: Xcode 16.4 (iOS 18 SDK) builds it and runs it on newer phones.
+  xcodeVersion: "16.4"
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "18.0"
   createIntermediateGroups: true
 packages:
   SK1Kit:
