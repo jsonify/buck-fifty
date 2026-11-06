@@ -226,10 +226,11 @@ public struct ListService {
 
     /// Checks an entry off or back on. Checking off during no trip starts one; every check-off is recorded with its
     /// time on the trip, which is the route later issues learn from. Unchecking during the trip removes that
-    /// check-off again, so a mis-tap teaches nothing.
+    /// check-off again, so a mis-tap teaches nothing. Returns the new check-off when checking off.
+    @discardableResult
     public func setChecked(_ entry: ListEntry, _ checked: Bool, by shopper: Shopper, source: String = "tap",
-                           now: Date = Date()) {
-        guard entry.isChecked != checked, let item = entry.item, let store = item.store else { return }
+                           now: Date = Date()) -> CheckOff? {
+        guard entry.isChecked != checked, let item = entry.item, let store = item.store else { return nil }
         if checked {
             let trip = startTrip(at: store, for: shopper, now: now)
             let checkOff = insert(CheckOff.self, alongside: store)
@@ -242,6 +243,7 @@ public struct ListService {
             entry.isChecked = true
             entry.checkedByID = shopper.id
             entry.checkedByName = shopper.name
+            return checkOff
         } else {
             if let trip = currentTrip(at: store, for: shopper, now: now),
                let last = (trip.checkOffs ?? []).filter({ $0.item == item })
@@ -253,7 +255,58 @@ public struct ListService {
             entry.isChecked = false
             entry.checkedByID = nil
             entry.checkedByName = nil
+            return nil
         }
+    }
+
+    // MARK: The floor plan (issue #5)
+
+    /// Where the item is on the floor plan: the median of its most recent mapped check-offs.
+    public func spot(of item: Item) -> FloorPoint? {
+        FloorPlan.median(recentPoints(of: item))
+    }
+
+    /// The item's spot once it has settled enough to correct a trip's drift (see `FloorPlan.landmark`).
+    public func landmark(of item: Item) -> FloorPoint? {
+        FloorPlan.landmark(recentPoints(of: item))
+    }
+
+    /// Where the store's checkout is: the median of where recent mapped trips ended.
+    public func checkoutSpot(in store: Store) -> FloorPoint? {
+        let ends = (store.trips ?? []).filter { $0.endedAt != nil && !$0.isDeleted }
+            .sorted { ($0.endedAt ?? .distantPast) > ($1.endedAt ?? .distantPast) }
+            .compactMap { $0.floorPath.last }
+            .prefix(FloorPlan.recentPoints)
+        return FloorPlan.median(Array(ends))
+    }
+
+    /// The most recently ended mapped trip at the store.
+    public func lastMappedTrip(at store: Store) -> Trip? {
+        (store.trips ?? []).filter { $0.endedAt != nil && $0.path != nil && !$0.isDeleted }
+            .max { ($0.endedAt ?? .distantPast) < ($1.endedAt ?? .distantPast) }
+    }
+
+    /// Puts a mapped point on a check-off.
+    public func setPoint(_ point: FloorPoint?, of checkOff: CheckOff) {
+        checkOff.x = point.map { NSNumber(value: $0.x) }
+        checkOff.y = point.map { NSNumber(value: $0.y) }
+    }
+
+    /// Saves a mapped trip's walk (drift corrected) and its check-offs' corrected points. A check-off that was
+    /// unchecked again is skipped.
+    public func recordPath(_ path: [FloorPoint], points: [CheckOff: FloorPoint], of trip: Trip) {
+        trip.path = FloorPlan.encode(FloorPlan.thinned(path))
+        for (checkOff, point) in points where !checkOff.isDeleted && checkOff.managedObjectContext != nil {
+            setPoint(point, of: checkOff)
+        }
+    }
+
+    private func recentPoints(of item: Item) -> [FloorPoint] {
+        (item.checkOffs ?? []).filter { !$0.isDeleted }
+            .sorted { ($0.timestamp ?? .distantPast) > ($1.timestamp ?? .distantPast) }
+            .compactMap(\.floorPoint)
+            .prefix(FloorPlan.recentPoints)
+            .map { $0 }
     }
 
     /// Learns the store's order from the trip's route: each item checked off on it moves toward where in the trip it

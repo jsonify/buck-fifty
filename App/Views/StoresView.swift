@@ -123,10 +123,28 @@ struct ProfileSheet: View {
                     .textContentType(.givenName)
                     .onSubmit { dismiss() }
             }
+            SKGroup(caption: "Experimental", note: mappingNote) {
+                SKRow(title: "Map the store", subtitle: "Builds a floor plan from your trips") {
+                    Toggle(isOn: $profile.mapsStore) { EmptyView() }
+                        .toggleStyle(.sk1Switch)
+                        .disabled(!StoreMapper.isAvailable)
+                        .accessibilityLabel("Map the store")
+                }
+            }
+            .onChange(of: profile.mapsStore) { _, on in
+                if on { StoreMapper.requestAccess() }
+            }
         } actions: {
             Spacer()
             Button("Done") { dismiss() }.buttonStyle(.sk1Key(.orange))
         }
-        .presentationDetents([.medium])
+    }
+
+    private var mappingNote: String {
+        guard StoreMapper.isAvailable else { return "This iPhone has no pedometer or compass to map with." }
+        return "Tap Start trip at the door and keep the app open: your steps and compass trace your walk, and every "
+            + "check-off becomes a point. After about ten trips the map shows where everything is. Steel shelves "
+            + "bend the compass, so expect it to wander. It asks for Motion & Fitness access; the walk stays on this "
+            + "phone and in your shared list."
     }
 }

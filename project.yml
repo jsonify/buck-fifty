@@ -49,6 +49,8 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         # Accept CloudKit share invitations (a shared list).
         CKSharingSupported: true
+        # Mapping the store from trips (issue #5, off unless turned on).
+        NSMotionUsageDescription: Buck Fifty counts your steps and reads the compass during a trip to map where things are in the store. The map stays on your phone and in your shared list.
         # Silent pushes when another phone changes a shared list.
         UIBackgroundModes:
           - remote-notification

@@ -309,6 +309,47 @@ final class ListServiceTests: XCTestCase {
         XCTAssertEqual(eggs.learned.recent, [0], "A neighbour keeps what trips taught it")
     }
 
+    // MARK: The floor plan (issue #5)
+
+    func testAnItemsSpotIsTheMedianOfItsRecentPoints() throws {
+        let store = try makeCostco()
+        let points = [FloorPoint(x: 10, y: 20), FloorPoint(x: 11, y: 21), FloorPoint(x: 40, y: 2)]
+        for (n, point) in points.enumerated() {
+            let entry = try XCTUnwrap(service.addToList("Coffee", store: store, by: jason))
+            let start = t0.addingTimeInterval(Double(n) * 86_400)
+            let checkOff = try XCTUnwrap(service.setChecked(entry, true, by: jason, now: start))
+            service.setPoint(point, of: checkOff)
+            service.finishTrip(at: store, for: jason, now: start.addingTimeInterval(60))
+        }
+        let coffee = try XCTUnwrap(service.item(named: "Coffee", in: store))
+        XCTAssertEqual(service.spot(of: coffee), FloorPoint(x: 11, y: 20))
+        XCTAssertEqual(service.landmark(of: coffee), FloorPoint(x: 11, y: 20), "Two of three agree: it has settled")
+
+        let tea = try XCTUnwrap(service.addToList("Tea", store: store, by: jason)?.item)
+        XCTAssertNil(service.spot(of: tea))
+    }
+
+    func testRecordingAMappedTrip() throws {
+        let store = try makeCostco()
+        let eggs = try XCTUnwrap(service.addToList("Eggs", store: store, by: jason))
+        let milk = try XCTUnwrap(service.addToList("Milk", store: store, by: jason))
+        let a = try XCTUnwrap(service.setChecked(eggs, true, by: jason, now: t0))
+        let b = try XCTUnwrap(service.setChecked(milk, true, by: jason, now: t0.addingTimeInterval(60)))
+        let trip = try XCTUnwrap(service.currentTrip(at: store, for: jason, now: t0.addingTimeInterval(61)))
+        service.setChecked(milk, false, by: jason, now: t0.addingTimeInterval(70))   // a mis-tap: no point for it
+        XCTAssertNil(service.setChecked(milk, false, by: jason, now: t0.addingTimeInterval(71)))
+
+        let walk = [FloorPoint.entrance, FloorPoint(x: 0, y: 10), FloorPoint(x: 5, y: 10)]
+        service.recordPath(walk, points: [a: FloorPoint(x: 0, y: 10), b: FloorPoint(x: 5, y: 10)], of: trip)
+        XCTAssertEqual(a.floorPoint, FloorPoint(x: 0, y: 10))
+        XCTAssertEqual(trip.floorPath, walk)
+        service.finishTrip(at: store, for: jason, now: t0.addingTimeInterval(120))
+        try service.save()
+
+        XCTAssertEqual(service.lastMappedTrip(at: store), trip)
+        XCTAssertEqual(service.checkoutSpot(in: store), FloorPoint(x: 5, y: 10))
+    }
+
     func testZonesReorderAddAndDelete() throws {
         let store = service.createStore(named: "Corner shop", zoneNames: ["A", "B", "C"])
         service.moveZone(in: store, from: 2, to: 0)

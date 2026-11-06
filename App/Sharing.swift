@@ -18,7 +18,10 @@ final class AppModel {
 
     private init() {
         let profile = Profile()
-        if Launch.isDemo { profile.name = "Jason" }
+        if Launch.isDemo {
+            profile.name = "Jason"
+            profile.mapsStore = true
+        }
         self.profile = profile
         persistence = AppData.makePersistence(shopper: profile.shopper)
         sharing = SharingModel(service: SharingService(persistence: persistence))

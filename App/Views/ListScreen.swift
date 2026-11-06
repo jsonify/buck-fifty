@@ -36,6 +36,7 @@ struct ListScreen: View {
     @State private var draft = ""
     @State private var editing: Editing?
     @State private var showingZones = false
+    @State private var showingMap = false
     @State private var appliedDemo = false
     /// The row a dragged item is over: it will take that row's place.
     @State private var dropTarget: NSManagedObjectID?
@@ -49,6 +50,7 @@ struct ListScreen: View {
     }
 
     private var service: ListService { ListService(context: context) }
+    private var mapper: StoreMapper { StoreMapper.shared }
     private var trip: Trip? { service.activeTrip(among: Array(openTrips), for: profile.shopper) }
     private var share: ShareSummary { sharing.summary(for: store) }
     /// Other people's trips at this store that are still going: they're in the store now.
@@ -85,6 +87,7 @@ struct ListScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $editing) { EditEntrySheet(entry: $0.entry, zones: Array(zones)) }
         .sheet(isPresented: $showingZones) { ZonesSheet(store: store) }
+        .sheet(isPresented: $showingMap) { FloorPlanSheet(store: store) }
         .onAppear {
             endLapsedTrips()
             applyDemoScreen()
@@ -128,6 +131,11 @@ struct ListScreen: View {
                 Button { showingZones = true } label: { Image(systemName: "square.stack.3d.up") }
                     .buttonStyle(.sk1Key())
                     .accessibilityLabel("Zones")
+                if profile.mapsStore {
+                    Button { showingMap = true } label: { Image(systemName: "map") }
+                        .buttonStyle(.sk1Key(isOn: mapper.isRecording(trip)))
+                        .accessibilityLabel(mapper.isRecording(trip) ? "Floor plan, mapping this trip" : "Floor plan")
+                }
                 Button {
                     Task { await sharing.presentSharing(for: store) }
                 } label: {
@@ -293,7 +301,10 @@ struct ListScreen: View {
     }
 
     private func toggle(_ entry: ListEntry) {
-        service.setChecked(entry, !entry.isChecked, by: profile.shopper)
+        let checkOff = service.setChecked(entry, !entry.isChecked, by: profile.shopper)
+        if let checkOff, let item = entry.item, mapper.isRecording(checkOff.trip) {
+            service.setPoint(mapper.mark(checkOff, landmark: service.landmark(of: item)), of: checkOff)
+        }
         save()
     }
 
@@ -304,15 +315,31 @@ struct ListScreen: View {
 
     private func toggleTrip() {
         if trip == nil {
-            service.startTrip(at: store, for: profile.shopper)
+            let started = service.startTrip(at: store, for: profile.shopper)
+            // Start trip is "start at the door": the origin of the map.
+            if profile.mapsStore, StoreMapper.isAvailable, !Launch.isDemo {
+                mapper.start(started, gridHeading: store.gridHeading?.doubleValue)
+            }
         } else {
+            if let trip, mapper.isRecording(trip) { finishMapping(trip, atCheckout: true) }
             service.finishTrip(at: store, for: profile.shopper)
         }
         save()
     }
 
+    /// Saves the mapped walk of `trip`. At the checkout (Done), the walk's end is pinned to the store's checkout.
+    private func finishMapping(_ trip: Trip, atCheckout: Bool) {
+        let result = mapper.finish(checkout: atCheckout ? service.checkoutSpot(in: store) : nil)
+        service.recordPath(result.path, points: result.points, of: trip)
+        if store.gridHeading == nil, let grid = result.gridHeading { store.gridHeading = NSNumber(value: grid) }
+    }
+
     private func endLapsedTrips() {
         _ = service.currentTrip(at: store, for: profile.shopper)
+        // A mapped trip that went quiet ended away from the checkout: keep its walk, uncorrected at the end.
+        if let mapped = mapper.trip, mapped.endedAt != nil, mapped.store == store {
+            finishMapping(mapped, atCheckout: false)
+        }
         save()
     }
 
@@ -331,6 +358,7 @@ struct ListScreen: View {
         switch Launch.demoScreen {
         case "add": draft = "chi"
         case "zones": showingZones = true
+        case "map": showingMap = true
         case "edit": editing = entries.first { $0.displayName == "Coffee beans" }.map(Editing.init)
         default: break
         }

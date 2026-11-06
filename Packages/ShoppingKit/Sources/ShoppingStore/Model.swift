@@ -20,6 +20,8 @@ public final class Store: NSManagedObject {
     @NSManaged public var id: UUID?
     @NSManaged public var name: String?
     @NSManaged public var createdAt: Date?
+    /// The compass heading of the store's aisles (degrees), learned from the first mapped trip (issue #5).
+    @NSManaged public var gridHeading: NSNumber?
     @NSManaged public var zones: Set<Zone>?
     @NSManaged public var items: Set<Item>?
     @NSManaged public var trips: Set<Trip>?
@@ -88,6 +90,8 @@ public final class Trip: NSManagedObject {
     @NSManaged public var lastActivityAt: Date?
     /// When the store's order was learned from this trip, so a trip only teaches it once.
     @NSManaged public var learnedAt: Date?
+    /// The trip's walk on the floor plan, drift corrected, as text (`FloorPlan.encode`); nil when it wasn't mapped.
+    @NSManaged public var path: String?
     @NSManaged public var store: Store?
     @NSManaged public var checkOffs: Set<CheckOff>?
 }
@@ -98,7 +102,7 @@ public final class CheckOff: NSManagedObject {
     @NSManaged public var timestamp: Date?
     /// "tap", "scan" (issue #6) or "watch" (issue #7).
     @NSManaged public var source: String?
-    /// Dead-reckoning position in metres from the entrance (issue #5).
+    /// Dead-reckoning position in metres from the entrance, x east and y north (issue #5); nil when not mapped.
     @NSManaged public var x: NSNumber?
     @NSManaged public var y: NSNumber?
     @NSManaged public var trip: Trip?
@@ -157,6 +161,7 @@ public enum ShoppingModel {
             attribute("id", .UUIDAttributeType),
             attribute("name", .stringAttributeType, default: ""),
             attribute("createdAt", .dateAttributeType),
+            attribute("gridHeading", .doubleAttributeType),
         ]
         let zone = entity(Zone.self, "Zone")
         zone.properties = [
@@ -199,6 +204,7 @@ public enum ShoppingModel {
             attribute("endedAt", .dateAttributeType),
             attribute("lastActivityAt", .dateAttributeType),
             attribute("learnedAt", .dateAttributeType),
+            attribute("path", .stringAttributeType),
         ]
         let checkOff = entity(CheckOff.self, "CheckOff")
         checkOff.properties = [
@@ -242,6 +248,19 @@ extension Store {
         (items ?? []).filter { !$0.isDeleted }.flatMap { ($0.entries ?? []).filter { !$0.isDeleted } }
     }
     public var remainingCount: Int { entries.filter { !$0.isChecked }.count }
+}
+
+extension CheckOff {
+    /// Where on the floor plan it was checked off, if the trip was mapped.
+    public var floorPoint: FloorPoint? {
+        guard let x, let y else { return nil }
+        return FloorPoint(x: x.doubleValue, y: y.doubleValue)
+    }
+}
+
+extension Trip {
+    /// The trip's walk on the floor plan (empty when it wasn't mapped).
+    public var floorPath: [FloorPoint] { FloorPlan.decode(path) }
 }
 
 extension Zone {
