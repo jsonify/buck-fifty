@@ -28,6 +28,9 @@ jobs:
   apple:
     runs-on: macos-latest
     timeout-minutes: 45
+    # To push the screenshots to the ci-screenshots branch.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       # The newest Xcode on the runner: the app targets iOS 26, and newer compilers report warnings older ones don't.
@@ -55,3 +58,17 @@ jobs:
           name: screenshots
           path: ${{ runner.temp }}/screenshots
           if-no-files-found: warn
+      # The latest screenshots also go to the ci-screenshots branch (one commit, replaced each run), so they can be
+      # fetched with git and linked from a PR without downloading the artifact.
+      - name: Publish screenshots to the ci-screenshots branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE: ${{ github.head_ref || github.ref_name }}
+        run: |
+          cd "$RUNNER_TEMP/screenshots" 2>/dev/null && ls *.png >/dev/null 2>&1 || { echo "No screenshots."; exit 0; }
+          git init -q -b ci-screenshots
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Screenshots of $SOURCE at ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screenshots
