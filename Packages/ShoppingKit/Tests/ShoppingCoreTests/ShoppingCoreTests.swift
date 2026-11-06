@@ -125,6 +125,47 @@ final class LearnedOrderTests: XCTestCase {
     }
 }
 
+final class ZonePlanTests: XCTestCase {
+    let plan = PlanDrawing(aspect: 2, blocks: [
+        PlanBlock("Frozen", zone: "Frozen", x: 0, y: 0, width: 0.5, height: 0.5),
+        PlanBlock("Strip", zone: "Snacks", x: 0.5, y: 0, width: 0.5, height: 0.02),
+        PlanBlock("Restrooms", zone: nil, x: 0.5, y: 0.5, width: 0.5, height: 0.5),
+    ], entranceX: 1, entranceY: 1)
+
+    func testTappingABlockChoosesItsZone() {
+        // A 200 x 100 drawing.
+        XCTAssertEqual(plan.block(atX: 50, y: 25, width: 200, height: 100)?.zone, "Frozen")
+        XCTAssertEqual(plan.block(atX: 150, y: 1, width: 200, height: 100)?.zone, "Snacks")
+        XCTAssertEqual(plan.block(atX: 150, y: 12, width: 200, height: 100)?.zone, "Snacks",
+                       "A thin strip is easy to hit")
+        XCTAssertNil(plan.block(atX: 190, y: 90, width: 200, height: 100, tolerance: 5),
+                     "Places that aren't zones aren't chosen")
+    }
+
+    func testTurningUpright() {
+        let upright = plan.upright
+        XCTAssertEqual(upright.aspect, 0.5)
+        XCTAssertEqual(upright.blocks[0].rect, PlanRect(x: 0.5, y: 0, width: 0.5, height: 0.5))
+        XCTAssertEqual(upright.blocks[1].rect.width, 0.02, accuracy: 1e-9)
+        XCTAssertEqual(upright.blocks[1].rect.height, 0.5, accuracy: 1e-9)
+        XCTAssertEqual(upright.blocks[1].rect.x, 0.98, accuracy: 1e-9)
+        XCTAssertEqual(upright.entranceX, 0)
+        XCTAssertEqual(upright.entranceY, 1)
+    }
+
+    func testTheAuroraVillagePlanCoversEveryZone() {
+        let aurora = DefaultZones.costcoAuroraVillagePlan
+        XCTAssertEqual(aurora.zones, Set(DefaultZones.costcoAuroraVillage))
+        for block in aurora.blocks {
+            XCTAssertTrue((0...1.001).contains(block.rect.x + block.rect.width), block.label)
+            XCTAssertTrue((0...1.001).contains(block.rect.y + block.rect.height), block.label)
+        }
+        XCTAssertEqual(DefaultZones.plan(forZones: DefaultZones.costcoAuroraVillage), aurora)
+        XCTAssertNil(DefaultZones.plan(forZones: DefaultZones.costco))
+        XCTAssertNil(DefaultZones.plan(forZones: []))
+    }
+}
+
 final class DragMoveTests: XCTestCase {
     /// The indices of `keys` in list order once the move from `from` to `to` has written its positions.
     func order(_ keys: [Double?], from: Int, to: Int) -> [Int] {

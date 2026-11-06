@@ -18,6 +18,10 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   Village" starts with that layout.
 - **Items are remembered.** Each item keeps its zone, so it lands in the right place every time it's back on the
   list, and autocomplete suggests it as you type.
+- **Choosing a zone.** In an item's editor, the zone key opens the chooser. A store using the Aurora Village layout
+  shows its floor plan (from the owner's drawing, turned upright, entrance at the square): tap the department and
+  that zone is chosen. Any store can use the list instead, a radio button per zone in walking order. One tap chooses
+  and closes.
 - **New items get a zone guess, on the phone.** Add something the store has never seen and Apple's on-device model
   (Foundation Models) picks its zone from your zone list, with a few items already in each zone as examples. It's
   guided generation, so it can only answer with one of your zones. No server, no network, no cost. It runs after the

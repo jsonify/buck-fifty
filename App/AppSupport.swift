@@ -5,7 +5,8 @@ import ShoppingCore
 import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
-/// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zones, map or everything.
+/// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zone (the zone map),
+/// zones, map or everything.
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }
@@ -123,13 +124,15 @@ enum DemoData {
     static func fill(_ context: NSManagedObjectContext, shopper: Shopper, screen: String) {
         let service = ListService(context: context)
         let partner = Shopper(id: "demo-partner", name: "Partner")
-        let costco = service.createStore(named: "Costco")
+        let costco = service.createStore(named: "Costco", zoneNames: DefaultZones.costcoAuroraVillage)
         let zones = costco.sortedZones
-        func add(_ name: String, zone: Int?, by who: Shopper = shopper, quantity: Int64 = 1, note: String? = nil) {
+        func add(_ name: String, zone: String?, by who: Shopper = shopper, quantity: Int64 = 1, note: String? = nil) {
             guard let entry = service.addToList(name, store: costco, by: who) else { return }
             entry.quantity = quantity
             entry.note = note
-            if let zone, zones.indices.contains(zone), let item = entry.item { service.setZone(zones[zone], for: item) }
+            if let zone, let item = entry.item, let match = zones.first(where: { $0.displayName == zone }) {
+                service.setZone(match, for: item)
+            }
         }
         // Two earlier trips, so the list is in the order they were walked. The coffee has moved over by the bakery,
         // and its learned place beats its zone's.
@@ -167,23 +170,23 @@ enum DemoData {
             }
             service.finishTrip(at: costco, for: shopper, now: start.addingTimeInterval(Double(walked.count) * 90))
         }
-        add("AA batteries", zone: 0)
-        add("Paper towels", zone: 2)
-        add("Toilet paper", zone: 2, by: partner)
-        add("Olive oil", zone: 3)
-        add("Coffee beans", zone: 3, by: partner, note: "The dark roast")
-        add("Peanut butter", zone: 3)
-        add("Chicken thighs", zone: 4)
-        add("Eggs", zone: 5, quantity: 2)
-        add("Greek yogurt", zone: 5, by: partner)
-        add("Milk", zone: 5)
-        add("Frozen berries", zone: 6)
-        add("Croissants", zone: 7, note: "If they're fresh")
-        add("Rotisserie chicken", zone: 8)
+        add("AA batteries", zone: "Electronics & optical")
+        add("Paper towels", zone: "Paper goods & water")
+        add("Toilet paper", zone: "Paper goods & water", by: partner)
+        add("Olive oil", zone: "Pantry")
+        add("Coffee beans", zone: "Pantry", by: partner, note: "The dark roast")
+        add("Peanut butter", zone: "Pantry")
+        add("Chicken thighs", zone: "Meat")
+        add("Eggs", zone: "Dairy & center coolers", quantity: 2)
+        add("Greek yogurt", zone: "Dairy & center coolers", by: partner)
+        add("Milk", zone: "Dairy & center coolers")
+        add("Frozen berries", zone: "Frozen")
+        add("Croissants", zone: "Bakery", note: "If they're fresh")
+        add("Rotisserie chicken", zone: "Rotisserie & deli")
         add("Kirkland pesto", zone: nil, by: partner)
         // What the on-device model would guess for an item it has never seen (issue #4).
         if let pesto = costco.entries.first(where: { $0.displayName == "Kirkland pesto" })?.item {
-            service.applyZoneGuess("Back cooler wall", to: pesto)
+            service.applyZoneGuess("Dairy & center coolers", to: pesto)
         }
         // Remembered from earlier trips but not on the list now: they show up as suggestions.
         for name in ["Chicken nuggets", "Chickpeas"] {

@@ -56,7 +56,8 @@ public enum DefaultZones {
 
     /// Zone lists a store can start again from (in the Zones sheet).
     public static let layouts = [
-        ZoneLayout(name: "Costco Aurora Village", detail: "From your floor plan", zones: costcoAuroraVillage),
+        ZoneLayout(name: "Costco Aurora Village", detail: "From your floor plan", zones: costcoAuroraVillage,
+                   plan: costcoAuroraVillagePlan),
         ZoneLayout(name: "Costco", detail: "A typical warehouse", zones: costco),
         ZoneLayout(name: "Any store", detail: "Grocery basics", zones: generic),
     ]
@@ -75,11 +76,14 @@ public struct ZoneLayout: Sendable, Equatable, Hashable {
     public var name: String
     public var detail: String
     public var zones: [String]
+    /// A floor plan drawing whose blocks are these zones, to pick a zone by tapping it.
+    public var plan: PlanDrawing?
 
-    public init(name: String, detail: String, zones: [String]) {
+    public init(name: String, detail: String, zones: [String], plan: PlanDrawing? = nil) {
         self.name = name
         self.detail = detail
         self.zones = zones
+        self.plan = plan
     }
 
     /// Whether `zoneNames` already are this layout (compared normalized, in order).

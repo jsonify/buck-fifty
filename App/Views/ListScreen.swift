@@ -364,7 +364,7 @@ struct ListScreen: View {
         case "zones": showingZones = true
         case "map": showingMap = true
         case "everything": showingEverything = true
-        case "edit": editing = entries.first { $0.displayName == "Coffee beans" }.map(Editing.init)
+        case "edit", "zone": editing = entries.first { $0.displayName == "Coffee beans" }.map(Editing.init)
         default: break
         }
     }
