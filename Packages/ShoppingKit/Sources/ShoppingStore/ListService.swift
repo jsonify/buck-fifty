@@ -112,10 +112,58 @@ public struct ListService {
         return entry
     }
 
-    /// Sets an item's zone by hand.
+    /// Sets an item's zone by hand (including "no zone"). A zone set by hand is never replaced by a guess.
     public func setZone(_ zone: Zone?, for item: Item) {
         item.storeZone = zone
-        item.zoneSource = zone == nil ? nil : "manual"
+        item.zoneSource = ZoneSource.manual
+    }
+
+    /// Marks a guessed zone as right, as if it had been set by hand.
+    public func confirmZone(of item: Item) {
+        if item.zoneSource == ZoneSource.guessed { item.zoneSource = ZoneSource.manual }
+    }
+
+    // MARK: Guessing zones (issue #4)
+
+    /// Whether the on-device model should guess the item's zone: it has none, nobody has set or guessed one (a guess
+    /// is written to the shared record, so the other phone doesn't guess again), and the store has zones.
+    public func needsZoneGuess(_ item: Item) -> Bool {
+        !item.isDeleted && item.storeZone == nil && item.zoneSource == nil && !(item.store?.zones ?? []).isEmpty
+    }
+
+    /// The store's zones in walking order, each with a few items already in it (the ones placed by hand or bought
+    /// most often first), as examples for the model.
+    public func zoneExamples(in store: Store) -> [ZoneExamples] {
+        store.sortedZones.map { zone in
+            let items = (zone.items ?? []).filter { !$0.isDeleted && $0.zoneSource != ZoneSource.guessed }
+                .sorted { ($1.positionSampleCount, $0.displayName) < ($0.positionSampleCount, $1.displayName) }
+            return ZoneExamples(name: zone.displayName,
+                                items: items.prefix(ZoneGuess.examplesPerZone).map(\.displayName))
+        }
+    }
+
+    /// Gives the item the zone the model answered, marked as guessed, unless it got a zone meanwhile (by hand, or a
+    /// guess from the other phone) or the answer isn't one of the store's zones. Returns the zone it got.
+    @discardableResult
+    public func applyZoneGuess(_ answer: String?, to item: Item) -> Zone? {
+        guard needsZoneGuess(item), let store = item.store else { return nil }
+        let zones = store.sortedZones
+        guard let index = ZoneGuess.resolve(answer, zoneNames: zones.map(\.displayName)) else { return nil }
+        item.storeZone = zones[index]
+        item.zoneSource = ZoneSource.guessed
+        return zones[index]
+    }
+
+    // MARK: Moving items by hand
+
+    /// Writes positions from a drag on the list (`ListOrdering.positionsAfterMove`). The moved item's recent samples
+    /// start again from where it was put, so trips refine the new place instead of snapping back to the old one.
+    public func place(_ positions: [Item: Double], moved: Item) {
+        for (item, position) in positions {
+            let p = min(max(position, 0), 1)
+            item.learnedPosition = NSNumber(value: p)
+            if item == moved { item.recentPositions = LearnedPosition.encode([p]) }
+        }
     }
 
     /// Renames an item. If the store already remembers the new name as another item, this entry moves to that item

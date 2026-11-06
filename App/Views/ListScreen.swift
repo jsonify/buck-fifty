@@ -37,6 +37,8 @@ struct ListScreen: View {
     @State private var editing: Editing?
     @State private var showingZones = false
     @State private var appliedDemo = false
+    /// The row a dragged item is over: it will take that row's place.
+    @State private var dropTarget: NSManagedObjectID?
 
     init(store: Store) {
         self.store = store
@@ -160,7 +162,23 @@ struct ListScreen: View {
 
     private var draftIsBlank: Bool { ItemName.cleaned(draft).isEmpty }
 
-    @ViewBuilder private var list: some View {
+    /// The list's rows with what ordering them needs.
+    private struct Arrangement {
+        let rows: [ListRow]
+        let zoneNames: [String]
+        let zonePositions: [Int: Double]
+
+        var sections: [ListSection<ListRow>] {
+            ListOrdering.sections(rows, zoneNames: zoneNames, zonePositions: zonePositions)
+        }
+
+        /// The rows still to get, in list order.
+        var unchecked: [ListRow] {
+            ListOrdering.sorted(rows, zoneCount: zoneNames.count, zonePositions: zonePositions).filter { !$0.isChecked }
+        }
+    }
+
+    private var arrangement: Arrangement {
         let zoneList = Array(zones)
         let rows = entries.map { entry in
             ListRow(entry: entry, zoneIndex: entry.item?.storeZone.flatMap { zoneList.firstIndex(of: $0) })
@@ -168,7 +186,11 @@ struct ListScreen: View {
         let zonePositions = ListOrdering.zoneAverages(items.map { item in
             (zone: item.storeZone.flatMap { zoneList.firstIndex(of: $0) }, position: item.learnedPosition?.doubleValue)
         })
-        let sections = ListOrdering.sections(rows, zoneNames: zoneList.map(\.displayName), zonePositions: zonePositions)
+        return Arrangement(rows: rows, zoneNames: zoneList.map(\.displayName), zonePositions: zonePositions)
+    }
+
+    @ViewBuilder private var list: some View {
+        let sections = arrangement.sections
         if sections.isEmpty {
             Text("Nothing on the list. Type above to add something; things you've bought before come back as you type.")
                 .sk1Hint()
@@ -178,9 +200,26 @@ struct ListScreen: View {
             SKGroup(caption: section.title) {
                 ForEach(section.entries, id: \.entry.objectID) { row in
                     EntryRow(entry: row.entry, me: profile.id, showsWho: share.isShared,
+                             guessedZone: row.entry.item?.isZoneGuessed == true,
                              toggle: { toggle(row.entry) },
                              edit: { editing = Editing(entry: row.entry) },
                              remove: { remove(row.entry) })
+                    // Hold and drag an item onto another to move it to that place in the walk (and that zone).
+                    .draggable(row.entry.id?.uuidString ?? "") { SKChip(row.entry.displayName) }
+                    .dropDestination(for: String.self) { ids, _ in
+                        move(ids.first, onto: row.entry)
+                    } isTargeted: { over in
+                        if over {
+                            dropTarget = row.entry.objectID
+                        } else if dropTarget == row.entry.objectID {
+                            dropTarget = nil
+                        }
+                    }
+                    .overlay {
+                        if dropTarget == row.entry.objectID {
+                            RoundedRectangle(cornerRadius: 6).stroke(Color(sk1Hex: SK1.orange), lineWidth: 2)
+                        }
+                    }
                 }
             }
         }
@@ -217,9 +256,40 @@ struct ListScreen: View {
     // MARK: Actions
 
     private func add(_ name: String) {
-        guard service.addToList(name, store: store, by: profile.shopper) != nil else { return }
+        guard let entry = service.addToList(name, store: store, by: profile.shopper) else { return }
         save()
         draft = ""
+        if let item = entry.item, service.needsZoneGuess(item) { guessZone(for: item) }
+    }
+
+    /// Asks the on-device model for a brand-new item's zone, in the background: adding never waits for it.
+    private func guessZone(for item: Item) {
+        let name = item.displayName, storeName = store.displayName, zones = service.zoneExamples(in: store)
+        Task {
+            let answer = await ZoneGuesser.guess(item: name, store: storeName, zones: zones)
+            if service.applyZoneGuess(answer, to: item) != nil { save() }
+        }
+    }
+
+    /// Moves the dragged entry (by its id) to `target`'s place in the list: it gets a position between its new
+    /// neighbours, and `target`'s zone if it has one.
+    private func move(_ id: String?, onto target: ListEntry) -> Bool {
+        dropTarget = nil
+        let arrangement = self.arrangement
+        let rows = arrangement.unchecked
+        guard let id, let from = rows.firstIndex(where: { $0.entry.id?.uuidString == id }),
+              let to = rows.firstIndex(where: { $0.entry == target }), from != to,
+              let item = rows[from].entry.item else { return false }
+        let keys = ListOrdering.walkPositions(rows, zoneCount: arrangement.zoneNames.count,
+                                              zonePositions: arrangement.zonePositions)
+        var positions: [Item: Double] = [:]
+        for (index, position) in ListOrdering.positionsAfterMove(keys, from: from, to: to) {
+            if let moved = rows[index].entry.item { positions[moved] = position }
+        }
+        if let zone = target.item?.storeZone, zone != item.storeZone { service.setZone(zone, for: item) }
+        service.place(positions, moved: item)
+        save()
+        return true
     }
 
     private func toggle(_ entry: ListEntry) {
@@ -274,6 +344,8 @@ struct EntryRow: View {
     let me: String
     /// Whether to say who (on a shared list).
     let showsWho: Bool
+    /// Whether the item's zone is the on-device model's guess (shown as a chip that opens the editor).
+    let guessedZone: Bool
     let toggle: () -> Void
     let edit: () -> Void
     let remove: () -> Void
@@ -293,6 +365,11 @@ struct EntryRow: View {
                 }
             }
             Spacer(minLength: 8)
+            if guessedZone {
+                Button(action: edit) { SKChip("GUESSED", minWidth: 64) }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Zone guessed: \(entry.item?.storeZone?.displayName ?? ""). Edit")
+            }
             if entry.quantity > 1 {
                 SKChip("×\(entry.quantity)", minWidth: 32)
             }

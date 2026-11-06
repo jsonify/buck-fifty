@@ -120,6 +120,52 @@ public enum ListOrdering {
         return sections
     }
 
+    /// New learned positions after a drag moves the unchecked entry at `from` to `to`. `keys` are the unchecked
+    /// entries' walk positions in list order (`walkPosition`, nil for the entries at the end with none). Returns the
+    /// position to give each entry that needs one, by its index in `keys`: the moved entry lands between its new
+    /// neighbours. When those neighbours share a position (items placed only by their zone), the whole tie gets
+    /// spread out, so the order sticks.
+    public static func positionsAfterMove(_ keys: [Double?], from: Int, to: Int) -> [Int: Double] {
+        guard keys.indices.contains(from), keys.indices.contains(to), from != to else { return [:] }
+        var order = Array(keys.indices)
+        order.remove(at: from)
+        order.insert(from, at: to)
+        /// The key of the entry at `index` of the new order (nil for the moved entry and those without one).
+        func key(_ index: Int) -> Double? { order[index] == from ? nil : keys[order[index]] }
+        func spread(_ range: ClosedRange<Int>, above low: Double, below high: Double) -> [Int: Double] {
+            var result: [Int: Double] = [:]
+            let step = (high - low) / Double(range.count + 1)
+            for (n, index) in range.enumerated() { result[order[index]] = low + step * Double(n + 1) }
+            return result
+        }
+
+        // Dropped among the entries at the end that have no position: they get positions up to the moved one.
+        if to > 0, key(to - 1) == nil {
+            var first = to - 1
+            while first > 0, key(first - 1) == nil { first -= 1 }
+            let low = first > 0 ? key(first - 1) ?? 0 : 0
+            return spread(first...to, above: low, below: 1)
+        }
+        let low = to > 0 ? key(to - 1) ?? 0 : 0
+        let high = to + 1 < order.count ? key(to + 1) ?? 1 : 1
+        if low < high { return [from: (low + high) / 2] }
+
+        // A tie: spread every entry at that position (the moved one among them) between the positions either side.
+        let tied = low
+        var first = to, last = to
+        while first > 0, key(first - 1) == tied { first -= 1 }
+        while last + 1 < order.count, key(last + 1) == tied { last += 1 }
+        let below = first > 0 ? key(first - 1) ?? 0 : min(0, tied)
+        let above = last + 1 < order.count ? key(last + 1) ?? 1 : max(1, tied)
+        return spread(first...last, above: below, below: above)
+    }
+
+    /// The walk positions of `entries`, as `sorted` uses them (see `positionsAfterMove`).
+    public static func walkPositions<E: ListSortable>(_ entries: [E], zoneCount: Int,
+                                                      zonePositions: [Int: Double]) -> [Double?] {
+        entries.map { walkPosition(of: $0, zoneCount: zoneCount, zonePositions: zonePositions) }
+    }
+
     /// Where in the walk an unchecked entry is expected: its learned position, its zone's average, or its zone's
     /// place in the walking order; nil (the end of the list) for an entry with none of those.
     static func walkPosition<E: ListSortable>(of entry: E, zoneCount: Int, zonePositions: [Int: Double]) -> Double? {
