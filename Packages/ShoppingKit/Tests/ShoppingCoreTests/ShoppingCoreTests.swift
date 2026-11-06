@@ -113,6 +113,69 @@ final class LearnedOrderTests: XCTestCase {
     }
 }
 
+final class DragMoveTests: XCTestCase {
+    /// The indices of `keys` in list order once the move from `from` to `to` has written its positions.
+    func order(_ keys: [Double?], from: Int, to: Int) -> [Int] {
+        var keys = keys
+        for (index, position) in ListOrdering.positionsAfterMove(keys, from: from, to: to) { keys[index] = position }
+        return keys.indices.sorted { (keys[$0] ?? .infinity, $0) < (keys[$1] ?? .infinity, $1) }
+    }
+
+    func testMovedEntryLandsBetweenItsNewNeighbours() {
+        let keys: [Double?] = [0.1, 0.3, 0.5, 0.7]
+        XCTAssertEqual(ListOrdering.positionsAfterMove(keys, from: 0, to: 2), [0: 0.6])
+        XCTAssertEqual(order(keys, from: 0, to: 2), [1, 2, 0, 3])
+        XCTAssertEqual(order(keys, from: 3, to: 0), [3, 0, 1, 2])
+        XCTAssertEqual(order(keys, from: 1, to: 3), [0, 2, 3, 1])
+    }
+
+    func testMovingIntoATieSpreadsTheTie() {
+        // Three items placed only by their zone share a position; drop the last item between two of them.
+        let keys: [Double?] = [0.2, 0.5, 0.5, 0.5, 0.8]
+        XCTAssertEqual(order(keys, from: 4, to: 2), [0, 1, 4, 2, 3])
+        XCTAssertEqual(order(keys, from: 1, to: 3), [0, 2, 3, 1, 4])
+    }
+
+    func testMovingAmongEntriesWithoutPositions() {
+        let keys: [Double?] = [0.2, 0.6, nil, nil, nil]
+        XCTAssertEqual(order(keys, from: 0, to: 3), [1, 2, 3, 0, 4])
+        XCTAssertEqual(order([0.2, 0.6, nil], from: 0, to: 1), [1, 0, 2])
+        XCTAssertEqual(order(keys, from: 4, to: 0), [4, 0, 1, 2, 3])
+    }
+
+    func testNoMove() {
+        XCTAssertTrue(ListOrdering.positionsAfterMove([0.1, 0.2], from: 1, to: 1).isEmpty)
+        XCTAssertTrue(ListOrdering.positionsAfterMove([0.1, 0.2], from: 0, to: 5).isEmpty)
+    }
+}
+
+final class ZoneGuessTests: XCTestCase {
+    func testPromptListsZonesInOrderWithExamples() {
+        let prompt = ZoneGuess.prompt(item: " kirkland  pesto ", store: "Costco", zones: [
+            ZoneExamples(name: "Pantry aisles", items: ["Olive oil", "Coffee", "Peanut butter", "Rice", "Flour"]),
+            ZoneExamples(name: "Back cooler wall", items: ["Milk"]),
+            ZoneExamples(name: "Bakery"),
+        ])
+        XCTAssertEqual(prompt, """
+            Store: Costco
+            Zones, in walking order:
+            - Pantry aisles: Olive oil, Coffee, Peanut butter, Rice
+            - Back cooler wall: Milk
+            - Bakery
+            Item: kirkland pesto
+            Which zone is it in?
+            """)
+    }
+
+    func testOnlyARealZoneCounts() {
+        let zones = ["Pantry aisles", "Back cooler wall"]
+        XCTAssertEqual(ZoneGuess.resolve("  back cooler WALL", zoneNames: zones), 1)
+        XCTAssertNil(ZoneGuess.resolve("Garden centre", zoneNames: zones))
+        XCTAssertNil(ZoneGuess.resolve("", zoneNames: zones))
+        XCTAssertNil(ZoneGuess.resolve(nil, zoneNames: zones))
+    }
+}
+
 final class RouteLearningTests: XCTestCase {
     let learning = RouteLearning()
     let t0 = Date(timeIntervalSince1970: 1_000_000)

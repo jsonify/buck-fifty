@@ -228,6 +228,87 @@ final class ListServiceTests: XCTestCase {
         XCTAssertEqual(listOrder(store), ["Steak", "TV", "Pork", "Chicken", "Bread", "Pesto"])
     }
 
+    // MARK: Zone guesses (issue #4)
+
+    func testANewItemTakesAGuessedZoneOnce() throws {
+        let store = try makeCostco()
+        let entry = try XCTUnwrap(service.addToList("Kirkland pesto", store: store, by: jason))
+        let item = try XCTUnwrap(entry.item)
+        XCTAssertTrue(service.needsZoneGuess(item))
+
+        let zone = service.applyZoneGuess("back cooler wall", to: item)
+        XCTAssertEqual(zone?.displayName, "Back cooler wall")
+        XCTAssertTrue(item.isZoneGuessed)
+        XCTAssertFalse(service.needsZoneGuess(item), "A guess is kept: the other phone doesn't guess again")
+        XCTAssertNil(service.applyZoneGuess("Bakery", to: item))
+        XCTAssertEqual(item.storeZone?.displayName, "Back cooler wall")
+
+        service.confirmZone(of: item)
+        XCTAssertEqual(item.zoneSource, ZoneSource.manual)
+        XCTAssertFalse(item.isZoneGuessed)
+    }
+
+    func testAGuessNeverReplacesAZoneSetByHand() throws {
+        let store = try makeCostco()
+        let item = try XCTUnwrap(service.addToList("Mystery box", store: store, by: jason)?.item)
+        service.setZone(nil, for: item)
+        XCTAssertFalse(service.needsZoneGuess(item), "\"No zone\" chosen by hand counts")
+        XCTAssertNil(service.applyZoneGuess("Bakery", to: item))
+        XCTAssertNil(item.storeZone)
+    }
+
+    func testAnAnswerThatIsNotAZoneLeavesTheItemUnzoned() throws {
+        let store = try makeCostco()
+        let item = try XCTUnwrap(service.addToList("Pesto", store: store, by: jason)?.item)
+        XCTAssertNil(service.applyZoneGuess("Garden centre", to: item))
+        XCTAssertNil(service.applyZoneGuess(nil, to: item))
+        XCTAssertNil(item.storeZone)
+        XCTAssertTrue(service.needsZoneGuess(item))
+    }
+
+    func testZoneExamplesLeaveOutGuesses() throws {
+        let store = try makeCostco()
+        let pantry = store.sortedZones[3]
+        for name in ["Olive oil", "Coffee"] {
+            service.setZone(pantry, for: try XCTUnwrap(service.addToList(name, store: store, by: jason)?.item))
+        }
+        let guessed = try XCTUnwrap(service.addToList("Pesto", store: store, by: jason)?.item)
+        service.applyZoneGuess("Pantry aisles", to: guessed)
+        let examples = service.zoneExamples(in: store)
+        XCTAssertEqual(examples.map(\.name), DefaultZones.costco)
+        XCTAssertEqual(examples[3].items, ["Coffee", "Olive oil"])
+        XCTAssertEqual(examples[0].items, [])
+    }
+
+    func testLearnedPositionBeatsAGuess() throws {
+        let store = try makeCostco()
+        let pesto = try XCTUnwrap(service.addToList("Pesto", store: store, by: jason)?.item)
+        service.applyZoneGuess("Bakery", to: pesto)   // near the end of the walk
+        let tv = try XCTUnwrap(service.addToList("TV", store: store, by: jason)?.item)
+        service.setZone(store.sortedZones[0], for: tv)
+        XCTAssertEqual(listOrder(store), ["TV", "Pesto"])
+
+        // On the trip, the pesto was grabbed first.
+        for entry in store.entries { service.remove(entry) }
+        try walk(["Pesto", "TV"], in: store, start: t0)
+        for name in ["TV", "Pesto"] { service.addToList(name, store: store, by: jason) }
+        XCTAssertEqual(listOrder(store), ["Pesto", "TV"])
+    }
+
+    // MARK: Moving by hand
+
+    func testPlacingAnItemByHandRestartsItsSamples() throws {
+        let store = try makeCostco()
+        try walk(["Eggs", "Coffee", "Milk"], in: store, start: t0)
+        let coffee = try XCTUnwrap(service.item(named: "Coffee", in: store))
+        let eggs = try XCTUnwrap(service.item(named: "Eggs", in: store))
+        service.place([coffee: 0.9, eggs: 0.1], moved: coffee)
+        XCTAssertEqual(coffee.learnedPosition?.doubleValue, 0.9)
+        XCTAssertEqual(coffee.learned.recent, [0.9])
+        XCTAssertEqual(eggs.learnedPosition?.doubleValue, 0.1)
+        XCTAssertEqual(eggs.learned.recent, [0], "A neighbour keeps what trips taught it")
+    }
+
     func testZonesReorderAddAndDelete() throws {
         let store = service.createStore(named: "Corner shop", zoneNames: ["A", "B", "C"])
         service.moveZone(in: store, from: 2, to: 0)

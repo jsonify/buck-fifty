@@ -52,7 +52,8 @@ public final class Item: NSManagedObject {
     @NSManaged public var itemNumber: String?
     /// Never settles into one position (issue #8).
     @NSManaged public var isWandering: Bool
-    /// How the zone was set: "manual", or "guessed" by the on-device model (issue #4).
+    /// How the zone was set: "manual" (by hand, also for "no zone"), or "guessed" by the on-device model (issue #4);
+    /// nil when nobody has set or guessed one. See `ZoneSource`.
     @NSManaged public var zoneSource: String?
     @NSManaged public var createdAt: Date?
     @NSManaged public var store: Store?
@@ -102,6 +103,12 @@ public final class CheckOff: NSManagedObject {
     @NSManaged public var y: NSNumber?
     @NSManaged public var trip: Trip?
     @NSManaged public var item: Item?
+}
+
+/// The values of `Item.zoneSource`.
+public enum ZoneSource {
+    public static let manual = "manual"
+    public static let guessed = "guessed"
 }
 
 public enum ShoppingModel {
@@ -243,6 +250,8 @@ extension Zone {
 
 extension Item {
     public var displayName: String { name ?? "" }
+    /// Whether the item's zone is the on-device model's guess, not yet confirmed.
+    public var isZoneGuessed: Bool { storeZone != nil && zoneSource == ZoneSource.guessed }
     /// What the store has learned about where the item is.
     public var learned: LearnedPosition {
         LearnedPosition(position: learnedPosition?.doubleValue, sampleCount: Int(positionSampleCount),

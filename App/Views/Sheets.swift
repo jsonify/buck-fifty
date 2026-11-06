@@ -21,8 +21,7 @@ struct EditEntrySheet: View {
             CaptionedField(caption: "Name") {
                 SKTextField("Name", text: $name)
             }
-            CaptionedField(caption: "Zone",
-                           note: "Where it is in the store. It keeps this zone every time it's on the list.") {
+            CaptionedField(caption: entry.item?.isZoneGuessed == true ? "Zone · guessed" : "Zone", note: zoneNote) {
                 SKPicker(selection: $zone, options: zoneOptions)
             }
             CaptionedField(caption: "How many") {
@@ -45,6 +44,13 @@ struct EditEntrySheet: View {
         }
     }
 
+    private var zoneNote: String {
+        if entry.item?.isZoneGuessed == true {
+            return "Guessed on this iPhone by Apple Intelligence. Save to keep it, or pick the right one."
+        }
+        return "Where it is in the store. It keeps this zone every time it's on the list."
+    }
+
     private var zoneOptions: [SKPicker<Zone?>.Option] {
         [SKPicker<Zone?>.Option(nil, "No zone")] + zones.map { SKPicker<Zone?>.Option($0, $0.displayName) }
     }
@@ -55,8 +61,13 @@ struct EditEntrySheet: View {
 
     private func save() {
         let service = ListService(context: context)
-        if let item = service.rename(entry, to: name), item.storeZone != zone {
-            service.setZone(zone, for: item)
+        if let item = service.rename(entry, to: name) {
+            // Changing the zone sets it by hand; saving a guessed one unchanged confirms it.
+            if item.storeZone != zone {
+                service.setZone(zone, for: item)
+            } else {
+                service.confirmZone(of: item)
+            }
         }
         entry.quantity = quantity
         let cleanedNote = ItemName.cleaned(note)
@@ -80,6 +91,8 @@ struct ZonesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @FetchRequest private var zones: FetchedResults<Zone>
     @State private var newZone = ""
+    /// The zone a dragged zone is over: it will take that zone's place.
+    @State private var dropTarget: NSManagedObjectID?
 
     init(store: Store) {
         self.store = store
@@ -91,7 +104,8 @@ struct ZonesSheet: View {
             if zones.isEmpty {
                 Text("No zones yet. Add the parts of the store in the order you walk through them.").sk1Hint()
             } else {
-                SKGroup(caption: "Walking order", note: "Front door at the top, checkout at the bottom.") {
+                SKGroup(caption: "Walking order",
+                        note: "Front door at the top, checkout at the bottom. Hold a zone and drag it to move it.") {
                     ForEach(Array(zones.enumerated()), id: \.element.objectID) { index, zone in
                         SKRow(title: zone.displayName, subtitle: itemCount(zone)) {
                             HStack(spacing: 4) {
@@ -106,6 +120,22 @@ struct ZonesSheet: View {
                                 Button { delete(zone) } label: { Image(systemName: "xmark") }
                                     .buttonStyle(.sk1Key(.round, size: .small))
                                     .accessibilityLabel("Delete \(zone.displayName)")
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .draggable(zone.id?.uuidString ?? "") { SKChip(zone.displayName) }
+                        .dropDestination(for: String.self) { ids, _ in
+                            drop(ids.first, at: index)
+                        } isTargeted: { over in
+                            if over {
+                                dropTarget = zone.objectID
+                            } else if dropTarget == zone.objectID {
+                                dropTarget = nil
+                            }
+                        }
+                        .overlay {
+                            if dropTarget == zone.objectID {
+                                RoundedRectangle(cornerRadius: 6).stroke(Color(sk1Hex: SK1.orange), lineWidth: 2)
                             }
                         }
                     }
@@ -136,6 +166,18 @@ struct ZonesSheet: View {
         let service = ListService(context: context)
         service.moveZone(in: store, from: index, to: index + offset)
         try? service.save()
+    }
+
+    /// Moves the dragged zone (by its id) to `index` in the walking order.
+    private func drop(_ id: String?, at index: Int) -> Bool {
+        dropTarget = nil
+        guard let id, let from = zones.firstIndex(where: { $0.id?.uuidString == id }), from != index else {
+            return false
+        }
+        let service = ListService(context: context)
+        service.moveZone(in: store, from: from, to: index)
+        try? service.save()
+        return true
     }
 
     private func delete(_ zone: Zone) {

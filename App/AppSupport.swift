@@ -154,6 +154,10 @@ enum DemoData {
         add("Croissants", zone: 7, note: "If they're fresh")
         add("Rotisserie chicken", zone: 8)
         add("Kirkland pesto", zone: nil, by: partner)
+        // What the on-device model would guess for an item it has never seen (issue #4).
+        if let pesto = costco.entries.first(where: { $0.displayName == "Kirkland pesto" })?.item {
+            service.applyZoneGuess("Back cooler wall", to: pesto)
+        }
         // Remembered from earlier trips but not on the list now: they show up as suggestions.
         for name in ["Chicken nuggets", "Chickpeas"] {
             if let entry = service.addToList(name, store: costco, by: shopper) { service.remove(entry) }

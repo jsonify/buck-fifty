@@ -11,9 +11,18 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
 
 - **Lists per store.** A new store called Costco starts with zones in walking order: entrance electronics, center
   tables, paper goods, pantry aisles, meat, the back cooler wall, frozen, bakery, then the rotisserie corner by the
-  checkout. You can add, delete and reorder them.
+  checkout. You can add, delete and reorder them (hold a zone in the Zones sheet and drag it, or use its arrows).
 - **Items are remembered.** Each item keeps its zone, so it lands in the right place every time it's back on the
   list, and autocomplete suggests it as you type.
+- **New items get a zone guess, on the phone.** Add something the store has never seen and Apple's on-device model
+  (Foundation Models) picks its zone from your zone list, with a few items already in each zone as examples. It's
+  guided generation, so it can only answer with one of your zones. No server, no network, no cost. It runs after the
+  item is added and never holds up adding; on an iPhone or iOS without Apple Intelligence, or with it off, the item
+  just stays unzoned. The row shows a **GUESSED** chip: tap it to fix the zone, or save to keep it. A zone you set by
+  hand (even "No zone") is never replaced by a guess, and the guess is saved to the shared list, so only one phone
+  guesses. Once you've bought the item, its learned position wins.
+- **Drag items into place.** Hold an item and drag it onto another: it takes that one's place in the walk, and its
+  zone. The drag sets its learned position, so the next trips start from where you put it rather than snapping back.
 - **Trips.** Checking something off in the store starts a trip, or you tap **Start trip**. Every check-off is saved
   with its time on the trip, so the order you check things off is your route through the store. Unchecking during the trip removes that check-off, so a mis-tap teaches nothing. **Done** ends the trip
   and clears what you bought; a trip with no check-offs for 45 minutes ends on its own. Each person gets their own
@@ -65,8 +74,8 @@ Sharing needs two real iCloud accounts to try out: the simulator can't receive t
 
 | Path | What |
 |---|---|
-| `App/` | The SwiftUI app: `BuckFiftyApp.swift`, `AppSupport.swift` (launch arguments, profile, fetches, demo data), `Sharing.swift` (the app model, the sharing sheet, accepting invitations), `Views/` |
-| `Packages/ShoppingKit` | The logic, as a Swift package: `ShoppingCore` (Foundation only: names, suggestions, list order, trip rules) and `ShoppingStore` (the Core Data model built in code, `Persistence` with its private and shared iCloud stores, `ListService` and `SharingService`) |
+| `App/` | The SwiftUI app: `BuckFiftyApp.swift`, `AppSupport.swift` (launch arguments, profile, fetches, demo data), `Sharing.swift` (the app model, the sharing sheet, accepting invitations), `ZoneGuesser.swift` (the on-device zone guess), `Views/` |
+| `Packages/ShoppingKit` | The logic, as a Swift package: `ShoppingCore` (Foundation only: names, suggestions, list order, learning the route, zone-guess prompts, trip rules) and `ShoppingStore` (the Core Data model built in code, `Persistence` with its private and shared iCloud stores, `ListService` and `SharingService`) |
 | `project.yml` | The Xcode project, for [XcodeGen](https://github.com/yonaskolb/XcodeGen) |
 | `Makefile`, `Scripts/dist.sh` | Build, run in the Simulator, install on your iPhone (see below) |
 | `Scripts/screenshots.sh` | Builds the app for the simulator, runs it on sample data and screenshots each screen |
