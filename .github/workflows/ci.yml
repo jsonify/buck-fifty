@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer run for the same branch replaces any older one still queued or running.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ShoppingCore is Foundation only, so it builds and tests on Linux. ShoppingStore (Core Data) builds empty there.
+  linux:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests (warnings are errors)
+        run: swift test --package-path Packages/ShoppingKit -Xswiftc -warnings-as-errors
+      - name: sk1-audit
+        shell: bash
+        run: Scripts/sk1-audit.sh App
+
+  apple:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      # The newest Xcode on the runner: the app targets iOS 26, and newer compilers report warnings older ones don't.
+      - name: Select newest Xcode
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$NEWEST"
+          xcodebuild -version
+      - name: Unit tests on macOS, Core Data included (warnings are errors)
+        run: swift test --package-path Packages/ShoppingKit -Xswiftc -warnings-as-errors
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      # Builds the app for the simulator (warnings are errors), runs it on sample data and screenshots each screen.
+      - name: Build, run and screenshot on the iOS Simulator
+        run: Scripts/screenshots.sh "$RUNNER_TEMP/screenshots"
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: warn

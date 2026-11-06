@@ -1,0 +1,47 @@
+# The Xcode project is generated from this file: `xcodegen generate` (brew install xcodegen). BuckFifty.xcodeproj
+# and App/Info.plist are build outputs and not committed.
+name: BuckFifty
+options:
+  bundleIdPrefix: com.jsonify
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  SK1Kit:
+    url: https://github.com/jsonify/SK1Kit.git
+    from: 0.4.1
+  ShoppingKit:
+    path: Packages/ShoppingKit
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  BuckFifty:
+    type: application
+    platform: iOS
+    sources:
+      - App
+    dependencies:
+      - package: SK1Kit
+        product: SK1Tokens
+      - package: SK1Kit
+        product: SK1UI
+      - package: ShoppingKit
+        product: ShoppingCore
+      - package: ShoppingKit
+        product: ShoppingStore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Buck Fifty
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.buckfifty
+        TARGETED_DEVICE_FAMILY: "1"
