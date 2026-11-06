@@ -60,6 +60,39 @@ public struct ListService {
         }
     }
 
+    /// Replaces the store's zones with `names`, in that walking order. A zone whose name (compared normalized) is in
+    /// `names` stays, with its items; items in the zones that go away lose their zone, and can be guessed again.
+    /// Blank and repeated names are skipped.
+    public func replaceZones(of store: Store, with names: [String]) {
+        var wanted: [String] = []
+        var seen = Set<String>()
+        for name in names.map(ItemName.cleaned) where !name.isEmpty && seen.insert(ItemName.normalized(name)).inserted {
+            wanted.append(name)
+        }
+        let old = store.sortedZones
+        var kept = Set<Zone>()
+        for (index, name) in wanted.enumerated() {
+            let key = ItemName.normalized(name)
+            let zone = old.first { !kept.contains($0) && ItemName.normalized($0.displayName) == key } ?? {
+                let zone = insert(Zone.self, alongside: store)
+                zone.id = UUID()
+                zone.store = store
+                return zone
+            }()
+            zone.name = name
+            zone.sortIndex = Int64(index)
+            kept.insert(zone)
+        }
+        for zone in old where !kept.contains(zone) {
+            for item in zone.items ?? [] {
+                item.storeZone = nil
+                item.zoneSource = nil
+            }
+            context.delete(zone)
+        }
+        context.processPendingChanges()
+    }
+
     /// Deletes a zone; its items keep their place on the list but lose their zone.
     public func deleteZone(_ zone: Zone) {
         let store = zone.store
