@@ -14,8 +14,15 @@ udid=$(Scripts/pick-simulator.sh)
 xcrun simctl boot "$udid" 2>/dev/null || true
 xcrun simctl bootstatus "$udid" -b
 
-xcodebuild build -project BuckFifty.xcodeproj -scheme BuckFifty -destination "id=$udid" \
-  -derivedDataPath build/Screenshots CODE_SIGNING_ALLOWED=NO | tee build/screenshots-build.log
+log=build/screenshots-build.log
+echo "==> Building for the simulator (log: $log)"
+if ! xcodebuild build -project BuckFifty.xcodeproj -scheme BuckFifty -destination "id=$udid" \
+    -derivedDataPath build/Screenshots CODE_SIGNING_ALLOWED=NO >"$log" 2>&1; then
+  # Just the diagnostics, so they're the last thing in the CI log. -a: xcodebuild logs can look binary to grep.
+  grep -aE "(error|warning): " "$log" | sort -u | head -60 >&2 || tail -40 "$log" >&2
+  echo "Build failed. Full log: $log" >&2
+  exit 1
+fi
 app=build/Screenshots/Build/Products/Debug-iphonesimulator/BuckFifty.app
 xcrun simctl install "$udid" "$app"
 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 \
