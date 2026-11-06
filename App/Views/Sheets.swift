@@ -96,6 +96,8 @@ struct ZonesSheet: View {
     @State private var newZone = ""
     /// The zone a dragged zone is over: it will take that zone's place.
     @State private var dropTarget: NSManagedObjectID?
+    /// The layout waiting for "Replace zones?" to be confirmed.
+    @State private var pendingLayout: ZoneLayout?
 
     init(store: Store) {
         self.store = store
@@ -144,6 +146,19 @@ struct ZonesSheet: View {
                     }
                 }
             }
+            SKGroup(caption: "Start from a layout",
+                    note: "Replaces these zones in one go. Zones with the same name keep their items.") {
+                ForEach(DefaultZones.layouts, id: \.self) { layout in
+                    Button { pendingLayout = layout } label: {
+                        SKRow(title: layout.name, subtitle: "\(layout.zones.count) zones · \(layout.detail)") {
+                            SKChip(layout.matches(zones.map(\.displayName)) ? "IN USE" : "USE", minWidth: 64)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(layout.matches(zones.map(\.displayName)))
+                }
+            }
             CaptionedField(caption: "Add a zone", note: "New zones go at the end; move them into place.") {
                 HStack(spacing: 6) {
                     SKTextField("Zone name", text: $newZone, prompt: "Pharmacy")
@@ -158,6 +173,33 @@ struct ZonesSheet: View {
             Spacer()
             Button("Done") { dismiss() }.buttonStyle(.sk1Key(.orange))
         }
+        .confirmationDialog("Replace the zones with \(pendingLayout?.name ?? "")?",
+                            isPresented: Binding(get: { pendingLayout != nil }, set: { if !$0 { pendingLayout = nil } }),
+                            titleVisibility: .visible) {
+            Button("Replace zones", role: .destructive) {
+                if let layout = pendingLayout { apply(layout) }
+            }
+        } message: {
+            Text(replaceMessage)
+        }
+    }
+
+    private var replaceMessage: String {
+        guard let layout = pendingLayout else { return "" }
+        let keys = Set(layout.zones.map(ItemName.normalized))
+        let losing = zones.filter { !keys.contains(ItemName.normalized($0.displayName)) }
+            .reduce(0) { $0 + ($1.items?.count ?? 0) }
+        let note = losing == 0 ? "" : " \(losing == 1 ? "1 item loses its zone" : "\(losing) items lose their zones") "
+            + "and can be guessed again."
+        return "\(layout.zones.count) zones in walking order.\(note) What you've learned about the order is kept."
+    }
+
+    private func apply(_ layout: ZoneLayout) {
+        let service = ListService(context: context)
+        service.replaceZones(of: store, with: layout.zones)
+        try? service.save()
+        pendingLayout = nil
+        ZoneGuessing.guessMissing(in: store, context: context)
     }
 
     private func itemCount(_ zone: Zone) -> String {

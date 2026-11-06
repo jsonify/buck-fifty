@@ -399,6 +399,31 @@ final class ListServiceTests: XCTestCase {
         XCTAssertEqual(service.lastTrip(at: store).map { service.items(boughtOn: $0).map(\.displayName) }, ["Eggs"])
     }
 
+    func testReplacingZonesKeepsTheOnesThatMatch() throws {
+        let store = try makeCostco()
+        let meat = store.sortedZones[4]
+        let steak = try XCTUnwrap(service.addToList("Steak", store: store, by: jason)?.item)
+        service.setZone(meat, for: steak)
+        let towels = try XCTUnwrap(service.addToList("Paper towels", store: store, by: jason)?.item)
+        service.setZone(store.sortedZones[2], for: towels)   // "Paper goods", which goes away
+
+        service.replaceZones(of: store, with: DefaultZones.costcoAuroraVillage)
+        try service.save()
+
+        XCTAssertEqual(store.sortedZones.map(\.displayName), DefaultZones.costcoAuroraVillage)
+        XCTAssertEqual(store.sortedZones.map(\.sortIndex), (0..<21).map { Int64($0) })
+        XCTAssertEqual(steak.storeZone, meat, "Meat is in both, so it stays, with its items")
+        XCTAssertEqual(meat.sortIndex, 6)
+        XCTAssertNil(towels.storeZone)
+        XCTAssertTrue(service.needsZoneGuess(towels), "An item whose zone went away can be guessed again")
+    }
+
+    func testReplacingZonesSkipsBlanksAndRepeats() throws {
+        let store = service.createStore(named: "Corner shop", zoneNames: ["A"])
+        service.replaceZones(of: store, with: ["  b ", "B", "", "a", "C"])
+        XCTAssertEqual(store.sortedZones.map(\.displayName), ["b", "a", "C"])
+    }
+
     func testZonesReorderAddAndDelete() throws {
         let store = service.createStore(named: "Corner shop", zoneNames: ["A", "B", "C"])
         service.moveZone(in: store, from: 2, to: 0)

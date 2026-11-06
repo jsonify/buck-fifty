@@ -46,6 +46,18 @@ final class DefaultZonesTests: XCTestCase {
         XCTAssertEqual(DefaultZones.costco.last, "Rotisserie corner")
         XCTAssertEqual(DefaultZones.zones(forStoreNamed: "Trader Joe's"), DefaultZones.generic)
     }
+
+    func testAuroraVillageLayout() {
+        let zones = DefaultZones.costcoAuroraVillage
+        XCTAssertEqual(zones.count, 21)
+        XCTAssertEqual(zones.first, "Electronics & optical")
+        XCTAssertEqual(Array(zones.suffix(3)), ["Checkout", "Food court", "Pharmacy lockers"])
+        XCTAssertEqual(Set(zones.map(ItemName.normalized)).count, zones.count, "No two zones share a name")
+        XCTAssertEqual(DefaultZones.zones(forStoreNamed: "Costco Aurora Village"), zones)
+        XCTAssertEqual(DefaultZones.zones(forStoreNamed: "Costco"), DefaultZones.costco)
+        XCTAssertTrue(DefaultZones.layouts[0].matches(zones.map { $0.uppercased() }))
+        XCTAssertFalse(DefaultZones.layouts[0].matches(DefaultZones.costco))
+    }
 }
 
 struct Entry: ListSortable, Equatable {

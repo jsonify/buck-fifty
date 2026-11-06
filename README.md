@@ -11,7 +11,11 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
 
 - **Lists per store.** A new store called Costco starts with zones in walking order: entrance electronics, center
   tables, paper goods, pantry aisles, meat, the back cooler wall, frozen, bakery, then the rotisserie corner by the
-  checkout. You can add, delete and reorder them (hold a zone in the Zones sheet and drag it, or use its arrows).
+  checkout. You can add, delete and reorder them (hold a zone in the Zones sheet and drag it, or use its arrows), or
+  start again from a layout in the Zones sheet: the Aurora Village Costco (21 zones from its floor plan, through the
+  checkout to the food court and the pharmacy lockers), a typical Costco, or any store. Zones with the same name keep
+  their items; items in zones that go away lose their zone and get guessed again. A store named "Costco Aurora
+  Village" starts with that layout.
 - **Items are remembered.** Each item keeps its zone, so it lands in the right place every time it's back on the
   list, and autocomplete suggests it as you type.
 - **New items get a zone guess, on the phone.** Add something the store has never seen and Apple's on-device model
