@@ -52,6 +52,7 @@ struct Entry: ListSortable, Equatable {
     var sortName: String
     var zoneIndex: Int?
     var isChecked = false
+    var learnedPosition: Double?
 }
 
 final class ListOrderingTests: XCTestCase {
@@ -82,6 +83,145 @@ final class ListOrderingTests: XCTestCase {
 
     func testEmptyListHasNoSections() {
         XCTAssertTrue(ListOrdering.sections([Entry](), zoneNames: ["Dairy"]).isEmpty)
+    }
+}
+
+final class LearnedOrderTests: XCTestCase {
+    func testLearnedPositionsBeatZonesAndZoneAveragesStandInForTheRest() {
+        let entries = [
+            Entry(sortName: "Coffee", zoneIndex: 1, learnedPosition: 0.9),   // moved to the back
+            Entry(sortName: "Tea", zoneIndex: 1),                            // its zone, not learned yet
+            Entry(sortName: "Steak", zoneIndex: 2, learnedPosition: 0.5),
+            Entry(sortName: "TV", zoneIndex: 0, learnedPosition: 0.05),
+            Entry(sortName: "Batteries", zoneIndex: nil, learnedPosition: 0.1),
+            Entry(sortName: "Pesto", zoneIndex: nil),
+        ]
+        // The store's Pantry items average 0.3 (Coffee's old place among them), so Tea, not learned yet, goes there.
+        let sections = ListOrdering.sections(entries, zoneNames: ["Front", "Pantry", "Meat"], zonePositions: [1: 0.3])
+        XCTAssertEqual(sections.flatMap(\.entries).map(\.sortName),
+                       ["TV", "Batteries", "Tea", "Steak", "Coffee", "Pesto"])
+        XCTAssertEqual(sections.map(\.kind), [.zone(0), .unzoned, .zone(1), .zone(2), .zone(1), .unzoned])
+        XCTAssertEqual(Set(sections.map(\.id)).count, sections.count, "Section ids are unique")
+        XCTAssertEqual(sections.map(\.title).last, ListOrdering.unzonedTitle)
+    }
+
+    func testZoneAverages() {
+        let averages = ListOrdering.zoneAverages([(zone: 0, position: 0.2), (zone: 0, position: 0.4),
+                                                  (zone: 1, position: nil), (zone: nil, position: 0.9)])
+        XCTAssertEqual(averages.count, 1)
+        XCTAssertEqual(averages[0] ?? -1, 0.3, accuracy: 1e-9)
+    }
+}
+
+final class RouteLearningTests: XCTestCase {
+    let learning = RouteLearning()
+    let t0 = Date(timeIntervalSince1970: 1_000_000)
+
+    /// A trip checking off `names` in order, `gap` seconds apart.
+    func trip(_ names: [String], gap: TimeInterval = 60) -> [RouteStop<String>] {
+        names.enumerated().map { RouteStop(item: $1, time: t0.addingTimeInterval(Double($0) * gap)) }
+    }
+
+    func testRankPositions() {
+        let p = learning.rankPositions(trip(["a", "b", "c", "d", "e"]))
+        XCTAssertEqual(p, ["a": 0, "b": 0.25, "c": 0.5, "d": 0.75, "e": 1])
+    }
+
+    func testRankIgnoresLongPausesButTimeDoesNot() {
+        // Ten minutes chatting in the bakery between b and c.
+        let stops = [RouteStop(item: "a", time: t0), RouteStop(item: "b", time: t0.addingTimeInterval(60)),
+                     RouteStop(item: "c", time: t0.addingTimeInterval(660)),
+                     RouteStop(item: "d", time: t0.addingTimeInterval(720))]
+        XCTAssertEqual(learning.rankPositions(stops)["b"] ?? -1, 1.0 / 3, accuracy: 1e-9)
+        XCTAssertEqual(learning.timePositions(stops)["b"] ?? -1, 60.0 / 720, accuracy: 1e-9)
+        XCTAssertEqual(learning.timePositions(stops)["d"], 1)
+    }
+
+    func testOutOfOrderAndRepeatedStopsCountOnceInTimeOrder() {
+        let stops = [RouteStop(item: "b", time: t0.addingTimeInterval(60)), RouteStop(item: "a", time: t0),
+                     RouteStop(item: "a", time: t0.addingTimeInterval(120)),
+                     RouteStop(item: "c", time: t0.addingTimeInterval(180))]
+        XCTAssertEqual(learning.usableStops(stops).map(\.item), ["a", "b", "c"])
+    }
+
+    func testOneCheckOffTeachesNothing() {
+        XCTAssertTrue(learning.rankPositions(trip(["a"])).isEmpty)
+        XCTAssertTrue(learning.timePositions(trip(["a"])).isEmpty)
+        XCTAssertTrue(learning.rankPositions([RouteStop<String>]()).isEmpty)
+    }
+
+    func testEndOfTripBurstIsIgnored() {
+        // Walked a, b, c, then checked the rest off at the checkout under a second apart.
+        var stops = trip(["a", "b", "c"])
+        let checkout = t0.addingTimeInterval(600)
+        for (i, name) in ["x", "y", "z", "w"].enumerated() {
+            stops.append(RouteStop(item: name, time: checkout.addingTimeInterval(Double(i) * 0.6)))
+        }
+        XCTAssertEqual(learning.usableStops(stops).map(\.item), ["a", "b", "c"])
+        XCTAssertEqual(learning.rankPositions(stops), ["a": 0, "b": 0.5, "c": 1])
+        XCTAssertNil(learning.timePositions(stops)["x"])
+    }
+
+    func testTwoQuickCheckOffsAtTheEndStillCount() {
+        // Two things off the same shelf a second apart are not a "check all".
+        var stops = trip(["a", "b"])
+        stops.append(RouteStop(item: "c", time: t0.addingTimeInterval(61)))
+        XCTAssertEqual(learning.usableStops(stops).map(\.item), ["a", "b", "c"])
+    }
+
+    func testAllInOneBurstTeachesNothing() {
+        XCTAssertTrue(learning.rankPositions(trip(["a", "b", "c", "d"], gap: 0.5)).isEmpty)
+    }
+
+    func testMovingAverageForgetsAndKeepsRecentSamples() {
+        var p = LearnedPosition()
+        p = learning.updated(p, with: 0.5)
+        XCTAssertEqual(p.position, 0.5)
+        p = learning.updated(p, with: 0.6)
+        XCTAssertEqual(p.position ?? -1, 0.54, accuracy: 1e-9)
+        for _ in 0..<20 { p = learning.updated(p, with: 0.5) }
+        XCTAssertEqual(p.sampleCount, 22)
+        XCTAssertEqual(p.recent.count, learning.sampleLimit)
+        XCTAssertEqual(p.spread ?? -1, 0, accuracy: 1e-9)
+        // One odd trip only nudges it.
+        p = learning.updated(p, with: 0.9)
+        XCTAssertEqual(p.position ?? -1, 0.66, accuracy: 1e-4)
+    }
+
+    func testSamplesRoundTripAsText() {
+        let text = LearnedPosition.encode([0.25, 0.8, 1])
+        XCTAssertEqual(text, "0.250,0.800,1.000")
+        XCTAssertEqual(LearnedPosition.decode(text), [0.25, 0.8, 1])
+        XCTAssertEqual(LearnedPosition.decode(nil), [])
+        XCTAssertNil(LearnedPosition.encode([]))
+    }
+
+    /// The coffee is at 20% of the walk for months, then moves to 80%: after at most two trips the list puts it in
+    /// its new place.
+    func testMovedItemSortsInItsNewPlaceWithinTwoTrips() {
+        let before = ["a", "b", "coffee", "c", "d", "e", "f", "g", "h", "i", "j"]
+        let after = ["a", "b", "c", "d", "e", "f", "g", "h", "coffee", "i", "j"]
+        var learned: [String: LearnedPosition] = [:]
+        func walk(_ route: [String]) {
+            for (name, p) in learning.rankPositions(trip(route)) {
+                learned[name] = learning.updated(learned[name] ?? LearnedPosition(), with: p)
+            }
+        }
+        func listOrder() -> [String] {
+            let entries = before.shuffled().map {
+                Entry(sortName: $0, zoneIndex: nil, learnedPosition: learned[$0]?.position)
+            }
+            return ListOrdering.sorted(entries).map(\.sortName)
+        }
+
+        for _ in 0..<30 { walk(before) }
+        XCTAssertEqual(learned["coffee"]?.position ?? -1, 0.2, accuracy: 1e-6)
+        XCTAssertEqual(listOrder(), before)
+
+        walk(after)
+        walk(after)
+        XCTAssertEqual(learned["coffee"]?.position ?? -1, 0.8, accuracy: 1e-6)
+        XCTAssertEqual(listOrder(), after)
     }
 }
 

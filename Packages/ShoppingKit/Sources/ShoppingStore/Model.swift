@@ -1,6 +1,7 @@
 #if canImport(CoreData)
 import CoreData
 import Foundation
+import ShoppingCore
 
 // The data model, built in code so there is no .xcdatamodeld to edit by hand. It follows NSPersistentCloudKitContainer's
 // rules, so it can be mirrored to iCloud and shared: every attribute is optional or has a default, every relationship
@@ -41,7 +42,12 @@ public final class Item: NSManagedObject {
     @NSManaged public var normalizedName: String?
     /// Where in a trip the item is grabbed, 0 (entrance) to 1 (checkout); learned from check-offs (issue #3).
     @NSManaged public var learnedPosition: NSNumber?
+    /// How many trips have taught `learnedPosition`.
     @NSManaged public var positionSampleCount: Int64
+    /// The latest positions trips found the item at, oldest first, as text ("0.250,0.800"; `LearnedPosition`).
+    @NSManaged public var recentPositions: String?
+    /// The same position learned by time on the trip instead of rank, kept to compare the two on real trips.
+    @NSManaged public var learnedTimePosition: NSNumber?
     /// The warehouse item number from a shelf tag (issue #6).
     @NSManaged public var itemNumber: String?
     /// Never settles into one position (issue #8).
@@ -79,6 +85,8 @@ public final class Trip: NSManagedObject {
     @NSManaged public var startedAt: Date?
     @NSManaged public var endedAt: Date?
     @NSManaged public var lastActivityAt: Date?
+    /// When the store's order was learned from this trip, so a trip only teaches it once.
+    @NSManaged public var learnedAt: Date?
     @NSManaged public var store: Store?
     @NSManaged public var checkOffs: Set<CheckOff>?
 }
@@ -156,6 +164,8 @@ public enum ShoppingModel {
             attribute("normalizedName", .stringAttributeType, default: ""),
             attribute("learnedPosition", .doubleAttributeType),
             attribute("positionSampleCount", .integer64AttributeType, default: 0),
+            attribute("recentPositions", .stringAttributeType),
+            attribute("learnedTimePosition", .doubleAttributeType),
             attribute("itemNumber", .stringAttributeType),
             attribute("isWandering", .booleanAttributeType, default: false),
             attribute("zoneSource", .stringAttributeType),
@@ -181,6 +191,7 @@ public enum ShoppingModel {
             attribute("startedAt", .dateAttributeType),
             attribute("endedAt", .dateAttributeType),
             attribute("lastActivityAt", .dateAttributeType),
+            attribute("learnedAt", .dateAttributeType),
         ]
         let checkOff = entity(CheckOff.self, "CheckOff")
         checkOff.properties = [
@@ -232,6 +243,11 @@ extension Zone {
 
 extension Item {
     public var displayName: String { name ?? "" }
+    /// What the store has learned about where the item is.
+    public var learned: LearnedPosition {
+        LearnedPosition(position: learnedPosition?.doubleValue, sampleCount: Int(positionSampleCount),
+                        recent: LearnedPosition.decode(recentPositions))
+    }
 }
 
 extension ListEntry {

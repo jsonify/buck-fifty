@@ -11,10 +11,13 @@ import ShoppingCore
 public struct ListService {
     public let context: NSManagedObjectContext
     public var policy: TripPolicy
+    public var learning: RouteLearning
 
-    public init(context: NSManagedObjectContext, policy: TripPolicy = TripPolicy()) {
+    public init(context: NSManagedObjectContext, policy: TripPolicy = TripPolicy(),
+                learning: RouteLearning = RouteLearning()) {
         self.context = context
         self.policy = policy
+        self.learning = learning
     }
 
     // MARK: Stores and zones
@@ -205,6 +208,43 @@ public struct ListService {
         }
     }
 
+    /// Learns the store's order from the trip's route: each item checked off on it moves toward where in the trip it
+    /// was grabbed. A trip teaches once (ending a trip does this); a trip with fewer than two check-offs that count
+    /// teaches nothing. Returns how many items learned something.
+    @discardableResult
+    public func learn(from trip: Trip, now: Date = Date()) -> Int {
+        guard trip.learnedAt == nil else { return 0 }
+        trip.learnedAt = trip.endedAt ?? now
+        let stops = route(of: trip).compactMap { checkOff -> RouteStop<Item>? in
+            guard let item = checkOff.item, !item.isDeleted, let time = checkOff.timestamp else { return nil }
+            return RouteStop(item: item, time: time)
+        }
+        let byRank = learning.rankPositions(stops)
+        let byTime = learning.timePositions(stops)
+        for (item, sample) in byRank {
+            let next = learning.updated(item.learned, with: sample)
+            item.learnedPosition = next.position.map { NSNumber(value: $0) }
+            item.positionSampleCount = Int64(next.sampleCount)
+            item.recentPositions = LearnedPosition.encode(next.recent)
+            if let timeSample = byTime[item] {
+                item.learnedTimePosition = NSNumber(value: learning.smoothed(item.learnedTimePosition?.doubleValue,
+                                                                             with: timeSample))
+            }
+        }
+        return byRank.count
+    }
+
+    /// The average learned position of each of the store's zones that has any (for items not learned yet).
+    public func zonePositions(in store: Store) -> [Zone: Double] {
+        let zones = store.sortedZones
+        let averages = ListOrdering.zoneAverages((store.items ?? []).filter { !$0.isDeleted }.map { item in
+            (zone: item.storeZone.flatMap { zones.firstIndex(of: $0) }, position: item.learnedPosition?.doubleValue)
+        })
+        var result: [Zone: Double] = [:]
+        for (index, average) in averages where zones.indices.contains(index) { result[zones[index]] = average }
+        return result
+    }
+
     /// The trip's check-offs in the order they happened.
     public func route(of trip: Trip) -> [CheckOff] {
         (trip.checkOffs ?? []).filter { !$0.isDeleted }.sorted { ($0.timestamp ?? .distantPast) < ($1.timestamp ?? .distantPast) }
@@ -232,6 +272,7 @@ public struct ListService {
 
     private func end(_ trip: Trip, at date: Date) {
         trip.endedAt = date
+        learn(from: trip, now: date)
         guard let store = trip.store, let shopperID = trip.shopperID else { return }
         for entry in store.entries where entry.isChecked && entry.checkedByID == shopperID {
             context.delete(entry)

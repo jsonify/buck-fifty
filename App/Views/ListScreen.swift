@@ -5,10 +5,11 @@ import SK1UI
 import ShoppingCore
 import ShoppingStore
 
-/// A row of the list, with its zone's place in the walk, for `ListOrdering`.
+/// A row of the list, with its zone's place in the walk and where trips found it, for `ListOrdering`.
 struct ListRow: ListSortable {
     let entry: ListEntry
     let zoneIndex: Int?
+    var learnedPosition: Double? { entry.item?.learnedPosition?.doubleValue }
     var sortName: String { entry.displayName }
     var isChecked: Bool { entry.isChecked }
 }
@@ -20,7 +21,8 @@ struct Editing: Identifiable {
 }
 
 /// One store's list (the main window recipe): the LCD saying what's going on, the trays of keys, the add field, then
-/// the list in zone trays in walking order, with what's in the cart at the bottom.
+/// the list in zone trays in the order the store is walked (learned from check-offs), with what's in the cart at the
+/// bottom.
 struct ListScreen: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
@@ -163,13 +165,16 @@ struct ListScreen: View {
         let rows = entries.map { entry in
             ListRow(entry: entry, zoneIndex: entry.item?.storeZone.flatMap { zoneList.firstIndex(of: $0) })
         }
-        let sections = ListOrdering.sections(rows, zoneNames: zoneList.map(\.displayName))
+        let zonePositions = ListOrdering.zoneAverages(items.map { item in
+            (zone: item.storeZone.flatMap { zoneList.firstIndex(of: $0) }, position: item.learnedPosition?.doubleValue)
+        })
+        let sections = ListOrdering.sections(rows, zoneNames: zoneList.map(\.displayName), zonePositions: zonePositions)
         if sections.isEmpty {
             Text("Nothing on the list. Type above to add something; things you've bought before come back as you type.")
                 .sk1Hint()
                 .fixedSize(horizontal: false, vertical: true)
         }
-        ForEach(sections, id: \.kind) { section in
+        ForEach(sections, id: \.id) { section in
             SKGroup(caption: section.title) {
                 ForEach(section.entries, id: \.entry.objectID) { row in
                     EntryRow(entry: row.entry, me: profile.id, showsWho: share.isShared,
