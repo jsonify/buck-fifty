@@ -9,6 +9,7 @@ import ShoppingStore
 struct StoresView: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(Profile.self) private var profile
+    @Environment(SharingModel.self) private var sharing
     @FetchRequest(fetchRequest: Fetch.stores()) private var stores: FetchedResults<Store>
     // Fetched so the counts redraw when any list changes, here or on the other person's phone.
     @FetchRequest(fetchRequest: Fetch.entries()) private var entries: FetchedResults<ListEntry>
@@ -65,7 +66,9 @@ struct StoresView: View {
 
     private func subtitle(for store: Store) -> String {
         let n = remaining(in: store)
-        return n == 0 ? "Nothing on the list" : n == 1 ? "1 thing to get" : "\(n) things to get"
+        let count = n == 0 ? "Nothing on the list" : n == 1 ? "1 thing to get" : "\(n) things to get"
+        let share = sharing.summary(for: store)
+        return share.isShared ? "\(count) · Shared with \(share.people)" : count
     }
 }
 
@@ -108,6 +111,7 @@ struct NewStoreSheet: View {
 /// Your name, as the people you share a list with see it.
 struct ProfileSheet: View {
     @Environment(Profile.self) private var profile
+    @Environment(SharingModel.self) private var sharing
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

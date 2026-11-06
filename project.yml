@@ -41,9 +41,15 @@ targets:
           - UIInterfaceOrientationPortrait
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+        # Accept CloudKit share invitations (a shared list).
+        CKSharingSupported: true
+        # Silent pushes when another phone changes a shared list.
+        UIBackgroundModes:
+          - remote-notification
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.buckfifty
+        CODE_SIGN_ENTITLEMENTS: App/BuckFifty.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         # The app's own code is warning-free. (Not passed on the command line: that would reach SK1Kit too, which
         # Xcode builds with warnings suppressed, and the two flags conflict.)

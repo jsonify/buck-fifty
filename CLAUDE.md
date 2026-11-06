@@ -9,6 +9,10 @@ the GitHub issues are the plan.
   defaulted, every relationship optional with an inverse, no ordered relationships, no unique constraints.
 - New objects go in the same persistent store as their `Store` (`ListService.insert(_:alongside:)`), or a shared list
   never gets them.
+- Don't name a Core Data attribute or relationship after an NSObject method (`zone`, `description`, `hash`,
+  `class`…): the generated accessor collides with it and crashes. That's why the item's zone is `storeZone`.
+- Sharing is CloudKit sharing of a `Store` through `NSPersistentCloudKitContainer` (`Persistence`, `SharingService`,
+  `App/Sharing.swift`). The demo has no iCloud, so `SharingModel.demoSummary` stands in.
 - Fetch by entity name (`Fetch`, `NSFetchRequest(entityName:)`), not `T.fetchRequest()` or `T(context:)`.
 - The UI follows SK1Kit's recipes (`.claude/skills/adopt-sk1kit/SKILL.md`): chassis on every screen and sheet, one orange
   key per screen, live numbers on the LCD. `Scripts/sk1-audit.sh App` must pass.

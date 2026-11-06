@@ -20,12 +20,44 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   and clears what you bought; a trip with no check-offs for 45 minutes ends on its own. Each person gets their own
   trip, so two people splitting up in the store don't mix their routes.
 
+- **Shared lists, live.** Tap the share key on a list to invite someone through Messages, Mail or a link. They
+  tap the invitation and the list appears in their app. From then on, anything either of you adds, edits or checks
+  off shows up on the other phone within seconds. On a shared list, rows say who added something ("Added by
+  Partner") or whose cart it's in. The LCD says when the other person is in the store.
+
+## Sharing: how it works
+
+Lists sync through iCloud with Core Data's `NSPersistentCloudKitContainer`. There's no server of our own, and
+nothing to pay beyond the Apple Developer Program membership the iCloud capability needs.
+
+- Two stores: **private** (`Private.sqlite`, your iCloud private database) holds your own lists, and **shared**
+  (`Shared.sqlite`, the shared database) holds lists other people shared with you.
+- Sharing a store's list makes a `CKShare` of the `Store`, which takes everything hanging off it with it: zones,
+  items, the list, trips and check-offs. That means the learned store order (#3) comes from both people's trips.
+- Anything added to a shared list goes into the same store the list is in (`ListService`). Otherwise it would stay
+  in your private database and the other person would never see it.
+- Changes arrive as silent CloudKit pushes and are merged into the view context, and `@FetchRequest`s redraw.
+  Offline changes are kept and sent when the phone is back online.
+- Accepting an invitation goes through `SceneDelegate` (`App/Sharing.swift`) into the shared store.
+
+### Setting up iCloud (once)
+
+1. In Xcode, choose your team under **Signing & Capabilities**. The project already has the iCloud (CloudKit)
+   and Push Notifications entitlements, with the container `iCloud.com.jsonify.buckfifty`. Xcode registers the
+   container the first time it signs the app.
+2. Run a Debug build on a phone signed in to iCloud, once, with the launch argument `-initializeCloudKitSchema`.
+   This creates the record types in the development environment.
+3. Before TestFlight or the App Store, open the [CloudKit console](https://icloud.developer.apple.com) and use
+   **Deploy Schema Changes** to copy the schema to production.
+
+Sharing needs two real iCloud accounts to try out: the simulator can't receive the pushes that make updates live.
+
 ## Layout
 
 | Path | What |
 |---|---|
-| `App/` | The SwiftUI app: `BuckFiftyApp.swift`, `AppSupport.swift` (launch arguments, profile, fetches, demo data), `Views/` |
-| `Packages/ShoppingKit` | The logic, as a Swift package: `ShoppingCore` (Foundation only: names, suggestions, list order, trip rules) and `ShoppingStore` (the Core Data model, built in code, and `ListService`) |
+| `App/` | The SwiftUI app: `BuckFiftyApp.swift`, `AppSupport.swift` (launch arguments, profile, fetches, demo data), `Sharing.swift` (the app model, the sharing sheet, accepting invitations), `Views/` |
+| `Packages/ShoppingKit` | The logic, as a Swift package: `ShoppingCore` (Foundation only: names, suggestions, list order, trip rules) and `ShoppingStore` (the Core Data model built in code, `Persistence` with its private and shared iCloud stores, `ListService` and `SharingService`) |
 | `project.yml` | The Xcode project, for [XcodeGen](https://github.com/yonaskolb/XcodeGen) |
 | `Scripts/screenshots.sh` | Builds the app for the simulator, runs it on sample data and screenshots each screen |
 | `Scripts/sk1-audit.sh` | Lists any native controls that have an SK-1 part (from SK1Kit) |

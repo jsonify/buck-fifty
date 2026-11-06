@@ -20,6 +20,7 @@ struct ListScreen: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Environment(Profile.self) private var profile
+    @Environment(SharingModel.self) private var sharing
     @FetchRequest private var entries: FetchedResults<ListEntry>
     @FetchRequest private var zones: FetchedResults<Zone>
     @FetchRequest private var items: FetchedResults<Item>
@@ -39,6 +40,15 @@ struct ListScreen: View {
 
     private var service: ListService { ListService(context: context) }
     private var trip: Trip? { service.activeTrip(among: Array(openTrips), for: profile.shopper) }
+    private var share: ShareSummary { sharing.summary(for: store) }
+    /// Other people's trips at this store that are still going: they're in the store now.
+    private var othersShopping: [String] {
+        openTrips.filter { other in
+            other.shopperID != profile.id
+                && service.activeTrip(among: [other], for: Shopper(id: other.shopperID ?? "", name: "")) != nil
+        }
+        .compactMap(\.shopperName)
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -79,7 +89,7 @@ struct ListScreen: View {
     private var display: some View {
         let left = entries.filter { !$0.isChecked }.count
         return SKDisplay(title: trip == nil ? "At home" : "In the store",
-                         detail: store.displayName.uppercased(),
+                         detail: share.isShared ? "SHARED · \(share.people.uppercased())" : store.displayName.uppercased(),
                          message: message(left: left),
                          number: left, digits: 3, unit: "LEFT", live: trip != nil)
     }
@@ -92,6 +102,7 @@ struct ListScreen: View {
         }
         if entries.isEmpty { return "List is empty" }
         if left == 0 { return "All in the cart" }
+        if let other = othersShopping.first { return "\(other) is in the store now" }
         return "Tap Start trip at the door"
     }
 
@@ -101,6 +112,14 @@ struct ListScreen: View {
                 Button { showingZones = true } label: { Image(systemName: "square.stack.3d.up") }
                     .buttonStyle(.sk1Key())
                     .accessibilityLabel("Zones")
+                Button {
+                    Task { await sharing.presentSharing(for: store) }
+                } label: {
+                    Image(systemName: share.isShared ? "person.2.fill" : "person.badge.plus")
+                }
+                .buttonStyle(.sk1Key(isOn: share.isShared))
+                .disabled(sharing.isWorking)
+                .accessibilityLabel(share.isShared ? "Shared with \(share.people)" : "Share this list")
             }
             Spacer()
             SKKeyTray(caption: "Trip") {
@@ -141,7 +160,7 @@ struct ListScreen: View {
         ForEach(sections, id: \.kind) { section in
             SKGroup(caption: section.title) {
                 ForEach(section.entries, id: \.entry.objectID) { row in
-                    EntryRow(entry: row.entry,
+                    EntryRow(entry: row.entry, me: profile.id, showsWho: share.isShared,
                              toggle: { toggle(row.entry) },
                              edit: { editing = row.entry },
                              remove: { remove(row.entry) })
@@ -234,6 +253,10 @@ struct ListScreen: View {
 /// One entry: the check square, the name (and its note), and how many.
 struct EntryRow: View {
     @ObservedObject var entry: ListEntry
+    /// This phone's shopper id: what someone else added or checked off says who.
+    let me: String
+    /// Whether to say who (on a shared list).
+    let showsWho: Bool
     let toggle: () -> Void
     let edit: () -> Void
     let remove: () -> Void
@@ -248,8 +271,8 @@ struct EntryRow: View {
                     .font(.sk1(SK1.TypeScale.rowTitle))
                     .strikethrough(entry.isChecked)
                     .sk1Ink(soft: entry.isChecked)
-                if let note = entry.note, !note.isEmpty {
-                    Text(note).sk1Hint()
+                if let detail {
+                    Text(detail).sk1Hint()
                 }
             }
             Spacer(minLength: 8)
@@ -266,5 +289,19 @@ struct EntryRow: View {
             Button("Remove from list", systemImage: "trash", role: .destructive, action: remove)
         }
         .accessibilityAction(named: "Edit", edit)
+    }
+
+    /// The note, and on a shared list who added it or has it in their cart when that isn't you.
+    private var detail: String? {
+        var parts: [String] = []
+        if let note = entry.note, !note.isEmpty { parts.append(note) }
+        if showsWho {
+            if entry.isChecked, let id = entry.checkedByID, id != me, let name = entry.checkedByName {
+                parts.append("In \(name)'s cart")
+            } else if !entry.isChecked, let id = entry.addedByID, id != me, let name = entry.addedByName {
+                parts.append("Added by \(name)")
+            }
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
