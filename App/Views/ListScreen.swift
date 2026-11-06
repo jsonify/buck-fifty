@@ -95,21 +95,27 @@ struct ListScreen: View {
     private var display: some View {
         let left = entries.filter { !$0.isChecked }.count
         return SKDisplay(title: trip == nil ? "At home" : "In the store",
-                         detail: share.isShared ? "SHARED · \(share.people.uppercased())" : store.displayName.uppercased(),
+                         detail: detail,
                          message: message(left: left),
                          number: left, digits: 3, unit: "LEFT", live: trip != nil)
     }
 
+    /// The line under the title: who else is in the store, who the list is shared with, or the store's name.
+    private var detail: String {
+        if let other = othersShopping.first { return "\(other.uppercased()) IN STORE" }
+        if share.isShared { return "SHARED · \(share.people.uppercased())" }
+        return store.displayName.uppercased()
+    }
+
+    /// The LCD's middle column: a few characters fit, so short status only.
     private func message(left: Int) -> String {
-        if let trip {
+        if trip != nil {
             let inCart = entries.filter { $0.isChecked && $0.checkedByID == profile.id }.count
-            let since = (trip.startedAt ?? Date()).formatted(date: .omitted, time: .shortened)
-            return "\(inCart) in cart · since \(since)"
+            return "\(inCart) in cart"
         }
-        if entries.isEmpty { return "List is empty" }
-        if left == 0 { return "All in the cart" }
-        if let other = othersShopping.first { return "\(other) is in the store now" }
-        return "Tap Start trip at the door"
+        if entries.isEmpty { return "Empty" }
+        if left == 0 { return "All in" }
+        return "Ready"
     }
 
     private var keys: some View {
