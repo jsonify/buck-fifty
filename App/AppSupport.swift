@@ -126,6 +126,20 @@ enum DemoData {
             entry.note = note
             if let zone, zones.indices.contains(zone), let item = entry.item { service.setZone(zones[zone], for: item) }
         }
+        // Two earlier trips, so the list is in the order they were walked. The coffee has moved over by the bakery,
+        // and its learned place beats its zone's.
+        let walked = ["AA batteries", "Paper towels", "Toilet paper", "Olive oil", "Peanut butter", "Chicken thighs",
+                      "Eggs", "Greek yogurt", "Milk", "Frozen berries", "Coffee beans", "Croissants",
+                      "Rotisserie chicken"]
+        for daysAgo in [14.0, 7.0] {
+            let start = Date().addingTimeInterval(-daysAgo * 24 * 60 * 60)
+            for (offset, name) in walked.enumerated() {
+                if let entry = service.addToList(name, store: costco, by: shopper, now: start) {
+                    service.setChecked(entry, true, by: shopper, now: start.addingTimeInterval(Double(offset) * 90))
+                }
+            }
+            service.finishTrip(at: costco, for: shopper, now: start.addingTimeInterval(Double(walked.count) * 90))
+        }
         add("AA batteries", zone: 0)
         add("Paper towels", zone: 2)
         add("Toilet paper", zone: 2, by: partner)

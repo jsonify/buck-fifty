@@ -15,10 +15,18 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
 - **Items are remembered.** Each item keeps its zone, so it lands in the right place every time it's back on the
   list, and autocomplete suggests it as you type.
 - **Trips.** Checking something off in the store starts a trip, or you tap **Start trip**. Every check-off is saved
-  with its time on the trip, so the order you check things off is your route through the store, which #3 learns
-  from. Unchecking during the trip removes that check-off, so a mis-tap teaches nothing. **Done** ends the trip
+  with its time on the trip, so the order you check things off is your route through the store. Unchecking during the trip removes that check-off, so a mis-tap teaches nothing. **Done** ends the trip
   and clears what you bought; a trip with no check-offs for 45 minutes ends on its own. Each person gets their own
   trip, so two people splitting up in the store don't mix their routes.
+- **The list learns the store's order.** Your check-offs are the map. When a trip ends, each item you checked off
+  gets a sample of where in the trip you grabbed it, by rank: the k-th of n check-offs is at k / (n − 1), from 0
+  (entrance) to 1 (checkout). Its learned position moves 40% of the way toward each sample, so old trips fade; and
+  when two trips in a row agree on a new place, it jumps there, so when the coffee moves the list catches up within
+  two trips. A check-all at the checkout (three or more check-offs under 2 s apart at the end) is ignored, and a trip
+  with fewer than two check-offs teaches nothing. The list is sorted by learned position; an item not learned yet
+  goes by its zone's average, then its zone's place in the walking order, and items with no zone go last. Each item
+  keeps its last 10 samples, and a time-based position too, to compare with the rank one on real trips. The logic is
+  `RouteLearning` in `ShoppingCore`; `ListService.learn(from:)` applies it when a trip ends.
 
 - **Shared lists, live.** Tap the share key on a list to invite someone through Messages, Mail or a link. They
   tap the invitation and the list appears in their app. From then on, anything either of you adds, edits or checks
@@ -46,8 +54,8 @@ nothing to pay beyond the Apple Developer Program membership the iCloud capabili
    Notifications entitlements, with the container `iCloud.com.jsonify.buckfifty`, and automatic signing registers
    the container and the App ID's capabilities the first time it signs the app.
 2. Run a Debug build from Xcode on a phone signed in to iCloud, once, with the launch argument
-   `-initializeCloudKitSchema` (Product > Scheme > Edit Scheme > Arguments). This creates the record types in the
-   development environment.
+   `-initializeCloudKitSchema` (Product > Scheme > Edit Scheme > Arguments), and again whenever the model gains
+   attributes. This creates the record types in the development environment.
 3. Before TestFlight or the App Store, open the [CloudKit console](https://icloud.developer.apple.com) and use
    **Deploy Schema Changes** to copy the schema to production.
 

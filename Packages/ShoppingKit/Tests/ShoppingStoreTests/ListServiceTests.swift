@@ -4,6 +4,15 @@ import XCTest
 import ShoppingCore
 @testable import ShoppingStore
 
+/// A list row for `ListOrdering`, as the app makes one.
+struct Row: ListSortable {
+    var name: String
+    var zoneIndex: Int?
+    var isChecked: Bool
+    var learnedPosition: Double?
+    var sortName: String { name }
+}
+
 final class ListServiceTests: XCTestCase {
     var persistence: Persistence!
     var service: ListService!
@@ -129,6 +138,94 @@ final class ListServiceTests: XCTestCase {
         XCTAssertNil(service.currentTrip(at: store, for: jason, now: t0.addingTimeInterval(46 * 60)))
         XCTAssertEqual(trip.endedAt, t0)
         XCTAssertTrue(store.entries.isEmpty, "What was checked off on the ended trip is bought")
+    }
+
+    /// Puts `names` on the list, checks them off in that order a minute apart from `start`, and ends the trip.
+    func walk(_ names: [String], in store: Store, start: Date, by shopper: Shopper? = nil) throws {
+        let who = shopper ?? jason
+        for (offset, name) in names.enumerated() {
+            let entry = try XCTUnwrap(service.addToList(name, store: store, by: who, now: start))
+            service.setChecked(entry, true, by: who, now: start.addingTimeInterval(Double(offset) * 60))
+        }
+        service.finishTrip(at: store, for: who, now: start.addingTimeInterval(Double(names.count) * 60))
+        try service.save()
+    }
+
+    /// The list's unchecked entries in list order, with the store's learned positions.
+    func listOrder(_ store: Store) -> [String] {
+        let zones = store.sortedZones
+        let averages = service.zonePositions(in: store)
+        let rows = store.entries.map { entry in
+            Row(name: entry.displayName, zoneIndex: entry.item?.storeZone.flatMap { zones.firstIndex(of: $0) },
+                isChecked: entry.isChecked, learnedPosition: entry.item?.learnedPosition?.doubleValue)
+        }
+        var byIndex: [Int: Double] = [:]
+        for (index, zone) in zones.enumerated() { byIndex[index] = averages[zone] }
+        return ListOrdering.sorted(rows, zoneCount: zones.count, zonePositions: byIndex).map(\.name)
+    }
+
+    func testFinishedTripTeachesTheOrderYouWalked() throws {
+        let store = try makeCostco()
+        let walked = ["Rotisserie chicken", "Eggs", "Coffee", "Batteries"]
+        try walk(walked, in: store, start: t0)
+
+        let coffee = try XCTUnwrap(service.item(named: "Coffee", in: store))
+        XCTAssertEqual(coffee.learnedPosition?.doubleValue ?? -1, 2.0 / 3, accuracy: 1e-9)
+        XCTAssertEqual(coffee.positionSampleCount, 1)
+        XCTAssertEqual(coffee.learned.recent.count, 1)
+        XCTAssertNotNil(coffee.learnedTimePosition)
+
+        // Next time they're on the list, in any order, it's the order you walked.
+        for name in walked.reversed() { service.addToList(name, store: store, by: jason) }
+        XCTAssertEqual(listOrder(store), walked)
+    }
+
+    func testATripTeachesOnlyOnce() throws {
+        let store = try makeCostco()
+        try walk(["Eggs", "Coffee"], in: store, start: t0)
+        let trip = try XCTUnwrap(store.trips?.first)
+        XCTAssertNotNil(trip.learnedAt)
+        XCTAssertEqual(service.learn(from: trip), 0)
+        XCTAssertEqual(service.item(named: "Coffee", in: store)?.positionSampleCount, 1)
+    }
+
+    func testCheckingEverythingOffAtTheCheckoutTeachesNothing() throws {
+        let store = try makeCostco()
+        try walk(["Eggs", "Coffee"], in: store, start: t0)
+        // The next trip: one thing walked to, then the rest checked off in a burst at the end.
+        let names = ["Coffee", "Eggs", "Milk", "Bread"]
+        let entries = try names.map { try XCTUnwrap(service.addToList($0, store: store, by: jason)) }
+        let start = t0.addingTimeInterval(7 * 24 * 60 * 60)
+        service.setChecked(entries[0], true, by: jason, now: start)
+        service.setChecked(entries[1], true, by: jason, now: start.addingTimeInterval(600))
+        service.setChecked(entries[2], true, by: jason, now: start.addingTimeInterval(600.7))
+        service.setChecked(entries[3], true, by: jason, now: start.addingTimeInterval(601.4))
+        service.finishTrip(at: store, for: jason, now: start.addingTimeInterval(700))
+        try service.save()
+
+        XCTAssertEqual(service.item(named: "Coffee", in: store)?.learnedPosition?.doubleValue, 1)
+        XCTAssertEqual(service.item(named: "Eggs", in: store)?.learnedPosition?.doubleValue, 0)
+        XCTAssertNil(service.item(named: "Milk", in: store)?.learnedPosition)
+        XCTAssertNil(service.item(named: "Bread", in: store)?.learnedPosition)
+    }
+
+    func testAnItemNotLearnedYetFollowsItsZonesLearnedItems() throws {
+        let store = try makeCostco()
+        let zones = store.sortedZones
+        try walk(["Steak", "Chicken", "Bread"], in: store, start: t0)
+        let meat = zones[4], bakery = zones[7]
+        for name in ["Steak", "Chicken"] { service.setZone(meat, for: try XCTUnwrap(service.item(named: name, in: store))) }
+        service.setZone(bakery, for: try XCTUnwrap(service.item(named: "Bread", in: store)))
+        // Learned: Steak 0, Chicken 0.5, Bread 1; so the meat zone averages 0.25.
+        let pork = try XCTUnwrap(service.addToList("Pork", store: store, by: jason))
+        service.setZone(meat, for: try XCTUnwrap(pork.item))
+        let tv = try XCTUnwrap(service.addToList("TV", store: store, by: jason))
+        service.setZone(zones[0], for: try XCTUnwrap(tv.item))
+        for name in ["Bread", "Chicken", "Steak", "Pesto"] { service.addToList(name, store: store, by: jason) }
+
+        XCTAssertEqual(service.zonePositions(in: store)[meat] ?? -1, 0.25, accuracy: 1e-9)
+        // TV's zone is first in the walk (1/18 of the way) with nothing learned; Pesto has no zone and goes last.
+        XCTAssertEqual(listOrder(store), ["Steak", "TV", "Pork", "Chicken", "Bread", "Pesto"])
     }
 
     func testZonesReorderAddAndDelete() throws {
