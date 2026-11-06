@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer run for the same branch replaces any older one still queued or running.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    # To push the screenshots to the ci-screenshots branch.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      # The newest Xcode on the runner: the app targets iOS 26, and newer compilers report warnings older ones don't.
+      - name: Select newest Xcode
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$NEWEST"
+          xcodebuild -version
+      - name: sk1-audit
+        run: Scripts/sk1-audit.sh App
+      - name: Unit tests, Core Data included (warnings are errors)
+        # A crash prints its backtrace in the log.
+        env:
+          SWIFT_BACKTRACE: enable=yes,sanitize=no
+        run: swift test --package-path Packages/ShoppingKit -Xswiftc -warnings-as-errors
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      # Builds the app for the simulator (its warnings are errors), runs it on sample data and screenshots each screen.
+      - name: Build, run and screenshot on the iOS Simulator
+        run: Scripts/screenshots.sh "$RUNNER_TEMP/screenshots"
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: warn
+      # The latest screenshots also go to the ci-screenshots branch (one commit, replaced each run), so they can be
+      # fetched with git and linked from a PR without downloading the artifact.
+      - name: Publish screenshots to the ci-screenshots branch
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE: ${{ github.head_ref || github.ref_name }}
+        run: |
+          cd "$RUNNER_TEMP/screenshots" 2>/dev/null && ls *.png >/dev/null 2>&1 || { echo "No screenshots."; exit 0; }
+          git init -q -b ci-screenshots
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Screenshots of $SOURCE at ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-screenshots
