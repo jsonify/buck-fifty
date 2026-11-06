@@ -13,6 +13,8 @@ the GitHub issues are the plan.
   `class`…): the generated accessor collides with it and crashes. That's why the item's zone is `storeZone`.
 - Sharing is CloudKit sharing of a `Store` through `NSPersistentCloudKitContainer` (`Persistence`, `SharingService`,
   `App/Sharing.swift`). The demo has no iCloud, so `SharingModel.demoSummary` stands in.
+- Core Data objects aren't `Identifiable` here: key `ForEach` by `id: \.objectID`, and give `sheet(item:)` a small
+  `Identifiable` wrapper (`Editing` in `ListScreen.swift`).
 - Fetch by entity name (`Fetch`, `NSFetchRequest(entityName:)`), not `T.fetchRequest()` or `T(context:)`.
 - The UI follows SK1Kit's recipes (`.claude/skills/adopt-sk1kit/SKILL.md`): chassis on every screen and sheet, one orange
   key per screen, live numbers on the LCD. `Scripts/sk1-audit.sh App` must pass.

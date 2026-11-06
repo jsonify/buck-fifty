@@ -11,8 +11,8 @@ bundle=com.jsonify.buckfifty
 
 udid=$(Scripts/pick-simulator.sh)
 
+# Boot now and wait after the build: the simulator starts up while the app compiles.
 xcrun simctl boot "$udid" 2>/dev/null || true
-xcrun simctl bootstatus "$udid" -b
 
 log=build/screenshots-build.log
 echo "==> Building for the simulator (log: $log)"
@@ -24,6 +24,7 @@ if ! xcodebuild build -project BuckFifty.xcodeproj -scheme BuckFifty -destinatio
   exit 1
 fi
 app=build/Screenshots/Build/Products/Debug-iphonesimulator/BuckFifty.app
+xcrun simctl bootstatus "$udid" -b >/dev/null
 xcrun simctl install "$udid" "$app"
 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 \
   --cellularBars 4 --wifiBars 3 || true

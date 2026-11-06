@@ -13,6 +13,12 @@ struct ListRow: ListSortable {
     var isChecked: Bool { entry.isChecked }
 }
 
+/// The entry the edit sheet is open on. Core Data objects aren't Identifiable here, so `sheet(item:)` gets this.
+struct Editing: Identifiable {
+    let entry: ListEntry
+    var id: NSManagedObjectID { entry.objectID }
+}
+
 /// One store's list (the main window recipe): the LCD saying what's going on, the trays of keys, the add field, then
 /// the list in zone trays in walking order, with what's in the cart at the bottom.
 struct ListScreen: View {
@@ -26,7 +32,7 @@ struct ListScreen: View {
     @FetchRequest private var items: FetchedResults<Item>
     @FetchRequest private var openTrips: FetchedResults<Trip>
     @State private var draft = ""
-    @State private var editing: ListEntry?
+    @State private var editing: Editing?
     @State private var showingZones = false
     @State private var appliedDemo = false
 
@@ -73,7 +79,7 @@ struct ListScreen: View {
         .sk1Chassis()
         .navigationTitle(store.displayName)
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $editing) { EditEntrySheet(entry: $0, zones: Array(zones)) }
+        .sheet(item: $editing) { EditEntrySheet(entry: $0.entry, zones: Array(zones)) }
         .sheet(isPresented: $showingZones) { ZonesSheet(store: store) }
         .onAppear {
             endLapsedTrips()
@@ -162,7 +168,7 @@ struct ListScreen: View {
                 ForEach(section.entries, id: \.entry.objectID) { row in
                     EntryRow(entry: row.entry, me: profile.id, showsWho: share.isShared,
                              toggle: { toggle(row.entry) },
-                             edit: { editing = row.entry },
+                             edit: { editing = Editing(entry: row.entry) },
                              remove: { remove(row.entry) })
                 }
             }
@@ -244,7 +250,7 @@ struct ListScreen: View {
         switch Launch.demoScreen {
         case "add": draft = "chi"
         case "zones": showingZones = true
-        case "edit": editing = entries.first { $0.displayName == "Coffee beans" }
+        case "edit": editing = entries.first { $0.displayName == "Coffee beans" }.map(Editing.init)
         default: break
         }
     }

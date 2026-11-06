@@ -29,7 +29,7 @@ struct StoresView: View {
                     }
                 } else {
                     SKGroup(caption: "Lists") {
-                        ForEach(stores) { store in
+                        ForEach(stores, id: \.objectID) { store in
                             NavigationLink(value: store) {
                                 SKRow(title: store.displayName, subtitle: subtitle(for: store)) {
                                     SKChip("\(remaining(in: store))", minWidth: 36)
