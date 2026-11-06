@@ -350,6 +350,55 @@ final class ListServiceTests: XCTestCase {
         XCTAssertEqual(service.checkoutSpot(in: store), FloorPoint(x: 5, y: 10))
     }
 
+    // MARK: Remembered items, after Done
+
+    func testTheLastTripIsStillThereAfterDone() throws {
+        let store = try makeCostco()
+        try walk(["Batteries", "Coffee", "Eggs"], in: store, start: t0)
+        try walk(["Milk", "Bread", "Milk"], in: store, start: t0.addingTimeInterval(86_400))
+        XCTAssertTrue(store.entries.isEmpty, "Done takes what was bought off the list")
+
+        let trip = try XCTUnwrap(service.lastTrip(at: store))
+        XCTAssertEqual(service.items(boughtOn: trip).map(\.displayName), ["Milk", "Bread"])
+        XCTAssertEqual(store.items?.count, 5, "Everything bought is still remembered")
+        let coffee = try XCTUnwrap(service.item(named: "Coffee", in: store))
+        XCTAssertNotNil(coffee.learnedPosition, "and where it was grabbed")
+        XCTAssertFalse(service.isOnList(coffee))
+        service.addToList("Coffee", store: store, by: jason)
+        XCTAssertTrue(service.isOnList(coffee))
+    }
+
+    func testNoLastTripWithoutCheckOffs() throws {
+        let store = try makeCostco()
+        service.startTrip(at: store, for: jason, now: t0)
+        service.finishTrip(at: store, for: jason, now: t0.addingTimeInterval(60))
+        XCTAssertNil(service.lastTrip(at: store))
+    }
+
+    func testRenamingARememberedItem() throws {
+        let store = try makeCostco()
+        let coffee = try XCTUnwrap(service.addToList("Cofee", store: store, by: jason)?.item)
+        service.addToList("Tea", store: store, by: jason)
+        XCTAssertTrue(service.renameItem(coffee, to: "  coffee beans "))
+        XCTAssertEqual(coffee.displayName, "coffee beans")
+        XCTAssertEqual(service.item(named: "Coffee Beans", in: store), coffee)
+        XCTAssertFalse(service.renameItem(coffee, to: "TEA"), "Another item already has that name")
+        XCTAssertFalse(service.renameItem(coffee, to: "   "))
+        XCTAssertEqual(coffee.displayName, "coffee beans")
+    }
+
+    func testForgettingAnItem() throws {
+        let store = try makeCostco()
+        try walk(["Eggs", "Coffee"], in: store, start: t0)
+        let coffee = try XCTUnwrap(service.item(named: "Coffee", in: store))
+        service.addToList("Coffee", store: store, by: jason)
+        service.forget(coffee)
+        try service.save()
+        XCTAssertNil(service.item(named: "Coffee", in: store))
+        XCTAssertTrue(store.entries.isEmpty)
+        XCTAssertEqual(service.lastTrip(at: store).map { service.items(boughtOn: $0).map(\.displayName) }, ["Eggs"])
+    }
+
     func testZonesReorderAddAndDelete() throws {
         let store = service.createStore(named: "Corner shop", zoneNames: ["A", "B", "C"])
         service.moveZone(in: store, from: 2, to: 0)

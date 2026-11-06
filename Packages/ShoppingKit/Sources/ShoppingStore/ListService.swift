@@ -187,6 +187,43 @@ public struct ListService {
         context.processPendingChanges()
     }
 
+    // MARK: Remembered items
+
+    /// Whether the item is on the list and not yet checked off.
+    public func isOnList(_ item: Item) -> Bool {
+        (item.entries ?? []).contains { !$0.isChecked && !$0.isDeleted }
+    }
+
+    /// Renames a remembered item. Refuses (returns false) a blank name, or one the store already remembers as another
+    /// item.
+    @discardableResult
+    public func renameItem(_ item: Item, to name: String) -> Bool {
+        let cleaned = ItemName.cleaned(name)
+        guard !cleaned.isEmpty, let store = item.store else { return false }
+        if let other = self.item(named: cleaned, in: store), other != item { return false }
+        item.name = cleaned
+        item.normalizedName = ItemName.normalized(cleaned)
+        return true
+    }
+
+    /// Forgets an item: it comes off the list and out of the suggestions, and its check-offs go with it.
+    public func forget(_ item: Item) {
+        context.delete(item)
+        context.processPendingChanges()
+    }
+
+    /// The store's most recently ended trip that checked something off (by anyone).
+    public func lastTrip(at store: Store) -> Trip? {
+        (store.trips ?? []).filter { $0.endedAt != nil && !$0.isDeleted && !route(of: $0).isEmpty }
+            .max { ($0.endedAt ?? .distantPast) < ($1.endedAt ?? .distantPast) }
+    }
+
+    /// The items a trip checked off, each once, in the order they were checked off.
+    public func items(boughtOn trip: Trip) -> [Item] {
+        var seen = Set<Item>()
+        return route(of: trip).compactMap(\.item).filter { !$0.isDeleted && seen.insert($0).inserted }
+    }
+
     // MARK: Trips and check-offs
 
     /// The shopper's trip at this store that is still going, if any. Trips that have gone quiet are ended on the way.
