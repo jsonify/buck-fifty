@@ -2,9 +2,9 @@
 import PackageDescription
 
 // The app's logic, kept out of the Xcode project so it can be tested with `swift test`.
-// - ShoppingCore: Foundation only (names, suggestions, list order, trip rules). Builds and tests on Linux.
-// - ShoppingStore: the Core Data + CloudKit layer. Every file is wrapped in `#if canImport(CoreData)`, so on Linux the
-//   module builds empty and only the macOS job runs its tests.
+// - ShoppingCore: Foundation only (names, suggestions, list order, trip rules), so it stays free of storage and UI.
+// - ShoppingStore: the Core Data + CloudKit layer. Every file is wrapped in `#if canImport(CoreData)`, so the package
+//   still builds (empty) where Core Data doesn't exist.
 let package = Package(
     name: "BuckFifty",
     platforms: [.iOS(.v17), .macOS(.v14)],

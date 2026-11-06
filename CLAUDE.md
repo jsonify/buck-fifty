@@ -3,7 +3,7 @@
 An iPhone shopping list that learns the store's order from check-offs, shared in real time. `README.md` is the overview;
 the GitHub issues are the plan.
 
-- Logic goes in `Packages/ShoppingKit`, not the app: `ShoppingCore` imports Foundation only so it tests on Linux, and
+- Logic goes in `Packages/ShoppingKit`, not the app: `ShoppingCore` imports Foundation only (no Core Data or UI), and
   `ShoppingStore` (Core Data) wraps every file in `#if canImport(CoreData)`.
 - The Core Data model is built in code (`Model.swift`) and must stay CloudKit-compatible: every attribute optional or
   defaulted, every relationship optional with an inverse, no ordered relationships, no unique constraints.

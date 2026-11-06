@@ -25,7 +25,7 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
 | Path | What |
 |---|---|
 | `App/` | The SwiftUI app: `BuckFiftyApp.swift`, `AppSupport.swift` (launch arguments, profile, fetches, demo data), `Views/` |
-| `Packages/ShoppingKit` | The logic, as a Swift package: `ShoppingCore` (Foundation only: names, suggestions, list order, trip rules; tests run on Linux) and `ShoppingStore` (the Core Data model, built in code, and `ListService`) |
+| `Packages/ShoppingKit` | The logic, as a Swift package: `ShoppingCore` (Foundation only: names, suggestions, list order, trip rules) and `ShoppingStore` (the Core Data model, built in code, and `ListService`) |
 | `project.yml` | The Xcode project, for [XcodeGen](https://github.com/yonaskolb/XcodeGen) |
 | `Scripts/screenshots.sh` | Builds the app for the simulator, runs it on sample data and screenshots each screen |
 | `Scripts/sk1-audit.sh` | Lists any native controls that have an SK-1 part (from SK1Kit) |
@@ -57,6 +57,6 @@ to open a particular screen. That's what the screenshots use.
 
 ## CI
 
-Every pull request runs the package tests on Linux and macOS with warnings as errors, plus the SK-1 audit. It also
+Every pull request runs one macOS job: the SK-1 audit and the package tests (warnings as errors). It then
 builds the app for the iOS Simulator, runs it, and uploads screenshots of each screen in light and dark as the
 `screenshots` artifact.

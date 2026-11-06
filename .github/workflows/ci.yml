@@ -12,19 +12,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ShoppingCore is Foundation only, so it builds and tests on Linux. ShoppingStore (Core Data) builds empty there.
-  linux:
-    runs-on: ubuntu-latest
-    container: swift:6.0
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - name: Unit tests (warnings are errors)
-        run: swift test --package-path Packages/ShoppingKit -Xswiftc -warnings-as-errors
-      - name: sk1-audit
-        shell: bash
-        run: Scripts/sk1-audit.sh App
-
   apple:
     runs-on: macos-latest
     timeout-minutes: 45
@@ -39,7 +26,9 @@ jobs:
           NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
           sudo xcode-select -s "$NEWEST"
           xcodebuild -version
-      - name: Unit tests on macOS, Core Data included (warnings are errors)
+      - name: sk1-audit
+        run: Scripts/sk1-audit.sh App
+      - name: Unit tests, Core Data included (warnings are errors)
         # A crash prints its backtrace in the log.
         env:
           SWIFT_BACKTRACE: enable=yes,sanitize=no
