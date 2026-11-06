@@ -6,7 +6,7 @@ import PackageDescription
 // - ShoppingStore: the Core Data + CloudKit layer. Every file is wrapped in `#if canImport(CoreData)`, so the package
 //   still builds (empty) where Core Data doesn't exist.
 let package = Package(
-    name: "BuckFifty",
+    name: "ShoppingKit",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "ShoppingCore", targets: ["ShoppingCore"]),

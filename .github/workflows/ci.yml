@@ -20,7 +20,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      # The newest Xcode on the runner: the app targets iOS 26, and newer compilers report warnings older ones don't.
+      # The newest Xcode on the runner: newer compilers report warnings older ones don't.
       - name: Select newest Xcode
         run: |
           NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
