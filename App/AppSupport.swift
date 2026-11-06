@@ -40,7 +40,12 @@ final class Profile {
 }
 
 enum AppData {
-    /// The app's store: on disk in Application Support, or in memory with sample data for `-demo`.
+    /// The iCloud container lists sync through. Xcode creates it the first time the app is signed with the iCloud
+    /// capability (Signing & Capabilities → iCloud → CloudKit).
+    static let cloudKitContainer = "iCloud.com.jsonify.buckfifty"
+
+    /// The app's store: private and shared stores in Application Support mirrored to iCloud, or in memory with sample
+    /// data for `-demo`.
     static func makePersistence(shopper: Shopper) -> Persistence {
         if Launch.isDemo, let demo = try? Persistence(.inMemory) {
             DemoData.fill(demo.viewContext, shopper: shopper, screen: Launch.demoScreen)
@@ -49,7 +54,18 @@ enum AppData {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("BuckFifty", isDirectory: true)
         do {
-            return try Persistence(.local(directory: directory))
+            let persistence = try Persistence(.cloudKit(containerIdentifier: cloudKitContainer, directory: directory))
+            #if DEBUG
+            // Run once with -initializeCloudKitSchema (signed in to iCloud) to create the record types in the
+            // development environment, then deploy the schema to production in the CloudKit console.
+            if Launch.arguments.contains("-initializeCloudKitSchema"),
+               let cloudKit = persistence.container as? NSPersistentCloudKitContainer {
+                do { try cloudKit.initializeCloudKitSchema(options: []) } catch {
+                    print("Buck Fifty: initializeCloudKitSchema failed: \(error)")
+                }
+            }
+            #endif
+            return persistence
         } catch {
             // A store that won't open shouldn't stop the app; nothing is kept until it does.
             print("Buck Fifty: couldn't open the store (\(error)); running in memory.")
@@ -133,11 +149,15 @@ enum DemoData {
         for name in ["Bananas", "Dark chocolate"] { service.addToList(name, store: tjs, by: shopper) }
 
         if screen == "trip" {
+            // You and your partner shopping the same list at once: two trips.
             let start = Date().addingTimeInterval(-14 * 60)
             for (offset, name) in ["AA batteries", "Paper towels", "Olive oil"].enumerated() {
                 if let entry = costco.entries.first(where: { $0.displayName == name }) {
                     service.setChecked(entry, true, by: shopper, now: start.addingTimeInterval(Double(offset) * 240))
                 }
+            }
+            if let entry = costco.entries.first(where: { $0.displayName == "Greek yogurt" }) {
+                service.setChecked(entry, true, by: partner, now: start.addingTimeInterval(500))
             }
         }
         try? service.save()

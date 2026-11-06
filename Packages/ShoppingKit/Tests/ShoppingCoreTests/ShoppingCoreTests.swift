@@ -99,3 +99,14 @@ final class TripPolicyTests: XCTestCase {
         XCTAssertEqual(Shopper.initials(of: "   "), "?")
     }
 }
+
+final class ShareSummaryTests: XCTestCase {
+    func testPeople() {
+        XCTAssertEqual(ShareSummary(isShared: true).people, "nobody yet")
+        XCTAssertEqual(ShareSummary(isShared: true, pending: 1).people, "1 invited")
+        XCTAssertEqual(ShareSummary(isShared: true, participants: ["Partner"]).people, "Partner")
+        XCTAssertEqual(ShareSummary(isShared: true, participants: ["Partner", "Sam"]).people, "Partner and Sam")
+        XCTAssertEqual(ShareSummary(isShared: true, participants: ["A", "B", "C"]).people, "3 people")
+        XCTAssertFalse(ShareSummary.notShared.isShared)
+    }
+}

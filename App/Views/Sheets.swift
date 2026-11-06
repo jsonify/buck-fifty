@@ -26,7 +26,7 @@ struct EditEntrySheet: View {
                 SKPicker(selection: $zone, options: zoneOptions)
             }
             CaptionedField(caption: "How many") {
-                SKPicker(selection: $quantity, options: (1...24).map { .init(Int64($0), "\($0)") })
+                SKPicker(selection: $quantity, options: quantityOptions)
             }
             CaptionedField(caption: "Note") {
                 SKTextField("Note", text: $note, prompt: "The dark roast, the big one…")
@@ -46,7 +46,11 @@ struct EditEntrySheet: View {
     }
 
     private var zoneOptions: [SKPicker<Zone?>.Option] {
-        [.init(nil, "No zone")] + zones.map { .init($0, $0.displayName) }
+        [SKPicker<Zone?>.Option(nil, "No zone")] + zones.map { SKPicker<Zone?>.Option($0, $0.displayName) }
+    }
+
+    private var quantityOptions: [SKPicker<Int64>.Option] {
+        (1...24).map { SKPicker<Int64>.Option(Int64($0), "\($0)") }
     }
 
     private func save() {

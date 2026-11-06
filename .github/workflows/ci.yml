@@ -33,6 +33,13 @@ jobs:
         env:
           SWIFT_BACKTRACE: enable=yes,sanitize=no
         run: swift test --package-path Packages/ShoppingKit -Xswiftc -warnings-as-errors
+      # SK1Kit's checkout, so the build doesn't fetch it again; keyed on project.yml, where its version is set.
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/Screenshots/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+          restore-keys: spm-${{ runner.os }}-
       - name: Generate the Xcode project
         run: |
           brew install xcodegen

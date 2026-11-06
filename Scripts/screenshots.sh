@@ -9,33 +9,22 @@ out="${1:-screenshots}"
 mkdir -p "$out" build
 bundle=com.jsonify.buckfifty
 
-# The newest iOS runtime's iPhone, a Pro (not a Max) if there is one.
-udid=$(xcrun simctl list devices available -j | python3 -c '
-import json, re, sys
-best = None
-for runtime, devices in json.load(sys.stdin)["devices"].items():
-    m = re.search(r"iOS-(\d+)-(\d+)", runtime)
-    if not m:
-        continue
-    for d in devices:
-        if not d.get("isAvailable") or not d["name"].startswith("iPhone"):
-            continue
-        pro = "Pro" in d["name"] and "Max" not in d["name"]
-        score = ((int(m[1]), int(m[2])), pro, d["name"])
-        if best is None or score > best[0]:
-            best = (score, d["udid"], d["name"])
-if best is None:
-    sys.exit("No iPhone simulator available")
-print(best[1])
-print(f"Simulator: {best[2]}, iOS {best[0][0][0]}.{best[0][0][1]}", file=sys.stderr)
-')
+udid=$(Scripts/pick-simulator.sh)
 
+# Boot now and wait after the build: the simulator starts up while the app compiles.
 xcrun simctl boot "$udid" 2>/dev/null || true
-xcrun simctl bootstatus "$udid" -b
 
-xcodebuild build -project BuckFifty.xcodeproj -scheme BuckFifty -destination "id=$udid" \
-  -derivedDataPath build CODE_SIGNING_ALLOWED=NO | tee build/screenshots-build.log
-app=build/Build/Products/Debug-iphonesimulator/BuckFifty.app
+log=build/screenshots-build.log
+echo "==> Building for the simulator (log: $log)"
+if ! xcodebuild build -project BuckFifty.xcodeproj -scheme BuckFifty -destination "id=$udid" \
+    -derivedDataPath build/Screenshots CODE_SIGNING_ALLOWED=NO >"$log" 2>&1; then
+  # Just the diagnostics, so they're the last thing in the CI log. -a: xcodebuild logs can look binary to grep.
+  grep -aE "(error|warning): " "$log" | sort -u | head -60 >&2 || tail -40 "$log" >&2
+  echo "Build failed. Full log: $log" >&2
+  exit 1
+fi
+app=build/Screenshots/Build/Products/Debug-iphonesimulator/BuckFifty.app
+xcrun simctl bootstatus "$udid" -b >/dev/null
 xcrun simctl install "$udid" "$app"
 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 \
   --cellularBars 4 --wifiBars 3 || true
