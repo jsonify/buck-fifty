@@ -7,7 +7,7 @@ import Foundation
 // is optional and has an inverse, nothing is ordered and there are no unique constraints.
 //
 // Store ─< Zone          a store's zones, in walking order (sortIndex)
-//   │  ─< Item >─ Zone   everything the store remembers; an item may have a zone
+//   │  ─< Item >─ Zone   everything the store remembers; an item may have a zone (storeZone)
 //   │        └─< ListEntry   the item on the current list
 //   │        └─< CheckOff
 //   └─< Trip ─< CheckOff     one shopper's trip, and what they checked off, when
@@ -50,7 +50,9 @@ public final class Item: NSManagedObject {
     @NSManaged public var zoneSource: String?
     @NSManaged public var createdAt: Date?
     @NSManaged public var store: Store?
-    @NSManaged public var zone: Zone?
+    /// The item's zone. Not called `zone`: NSObject already has a `-zone` method (the old NSZone allocator), and a
+    /// Core Data accessor by that name crashes the runtime.
+    @NSManaged public var storeZone: Zone?
     @NSManaged public var entries: Set<ListEntry>?
     @NSManaged public var checkOffs: Set<CheckOff>?
 }
@@ -196,7 +198,7 @@ public enum ShoppingModel {
         relate(store, "trips", toMany: true, deleteRule: .cascadeDeleteRule,
                trip, "store", toMany: false, deleteRule: .nullifyDeleteRule)
         relate(zone, "items", toMany: true, deleteRule: .nullifyDeleteRule,
-               item, "zone", toMany: false, deleteRule: .nullifyDeleteRule)
+               item, "storeZone", toMany: false, deleteRule: .nullifyDeleteRule)
         relate(item, "entries", toMany: true, deleteRule: .cascadeDeleteRule,
                entry, "item", toMany: false, deleteRule: .nullifyDeleteRule)
         relate(item, "checkOffs", toMany: true, deleteRule: .cascadeDeleteRule,

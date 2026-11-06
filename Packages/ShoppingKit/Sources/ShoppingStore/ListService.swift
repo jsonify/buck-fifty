@@ -111,7 +111,7 @@ public struct ListService {
 
     /// Sets an item's zone by hand.
     public func setZone(_ zone: Zone?, for item: Item) {
-        item.zone = zone
+        item.storeZone = zone
         item.zoneSource = zone == nil ? nil : "manual"
     }
 

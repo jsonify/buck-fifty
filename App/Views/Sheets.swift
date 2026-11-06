@@ -39,7 +39,7 @@ struct EditEntrySheet: View {
         }
         .onAppear {
             name = entry.displayName
-            zone = entry.item?.zone
+            zone = entry.item?.storeZone
             quantity = max(entry.quantity, 1)
             note = entry.note ?? ""
         }
@@ -51,7 +51,7 @@ struct EditEntrySheet: View {
 
     private func save() {
         let service = ListService(context: context)
-        if let item = service.rename(entry, to: name), item.zone != zone {
+        if let item = service.rename(entry, to: name), item.storeZone != zone {
             service.setZone(zone, for: item)
         }
         entry.quantity = quantity

@@ -130,7 +130,7 @@ struct ListScreen: View {
     @ViewBuilder private var list: some View {
         let zoneList = Array(zones)
         let rows = entries.map { entry in
-            ListRow(entry: entry, zoneIndex: entry.item?.zone.flatMap { zoneList.firstIndex(of: $0) })
+            ListRow(entry: entry, zoneIndex: entry.item?.storeZone.flatMap { zoneList.firstIndex(of: $0) })
         }
         let sections = ListOrdering.sections(rows, zoneNames: zoneList.map(\.displayName))
         if sections.isEmpty {
@@ -164,7 +164,7 @@ struct ListScreen: View {
             }
             ForEach(matches, id: \.objectID) { item in
                 Button { add(item.displayName) } label: {
-                    SKRow(title: item.displayName, subtitle: item.zone?.displayName ?? ListOrdering.unzonedTitle) {
+                    SKRow(title: item.displayName, subtitle: item.storeZone?.displayName ?? ListOrdering.unzonedTitle) {
                         SKChip(onList(item) ? "+1" : "ADD")
                     }
                     .contentShape(Rectangle())

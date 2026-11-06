@@ -37,6 +37,9 @@ jobs:
           sudo xcode-select -s "$NEWEST"
           xcodebuild -version
       - name: Unit tests on macOS, Core Data included (warnings are errors)
+        # A crash prints its backtrace in the log.
+        env:
+          SWIFT_BACKTRACE: enable=yes,sanitize=no
         run: swift test --package-path Packages/ShoppingKit -Xswiftc -warnings-as-errors
       - name: Generate the Xcode project
         run: |

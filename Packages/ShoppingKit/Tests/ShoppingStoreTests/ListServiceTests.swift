@@ -51,7 +51,7 @@ final class ListServiceTests: XCTestCase {
         try service.save()
 
         let next = try XCTUnwrap(service.addToList("rotisserie chicken", store: store, by: jason))
-        XCTAssertEqual(next.item?.zone, corner)
+        XCTAssertEqual(next.item?.storeZone, corner)
     }
 
     func testSuggestions() throws {
@@ -145,7 +145,7 @@ final class ListServiceTests: XCTestCase {
         try service.save()
         XCTAssertEqual(store.sortedZones.map(\.displayName), ["C", "B", "D"])
         XCTAssertEqual(store.sortedZones.map(\.sortIndex), [0, 1, 2])
-        XCTAssertNil(entry.item?.zone)
+        XCTAssertNil(entry.item?.storeZone)
     }
 
     func testRenameOntoAnExistingItemMovesTheEntry() throws {
