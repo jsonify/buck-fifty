@@ -5,7 +5,7 @@ import ShoppingCore
 import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
-/// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zones or map.
+/// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zones, map or everything.
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }

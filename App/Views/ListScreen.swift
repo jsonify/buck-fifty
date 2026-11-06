@@ -37,6 +37,8 @@ struct ListScreen: View {
     @State private var editing: Editing?
     @State private var showingZones = false
     @State private var showingMap = false
+    /// The Everything screen: the last trip and every remembered item.
+    @State private var showingEverything = false
     @State private var appliedDemo = false
     /// The row a dragged item is over: it will take that row's place.
     @State private var dropTarget: NSManagedObjectID?
@@ -88,8 +90,10 @@ struct ListScreen: View {
         .sheet(item: $editing) { EditEntrySheet(entry: $0.entry, zones: Array(zones)) }
         .sheet(isPresented: $showingZones) { ZonesSheet(store: store) }
         .sheet(isPresented: $showingMap) { FloorPlanSheet(store: store) }
+        .sheet(isPresented: $showingEverything) { EverythingSheet(store: store) }
         .onAppear {
             endLapsedTrips()
+            ZoneGuessing.guessMissing(in: store, context: context)
             applyDemoScreen()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -131,6 +135,9 @@ struct ListScreen: View {
                 Button { showingZones = true } label: { Image(systemName: "square.stack.3d.up") }
                     .buttonStyle(.sk1Key())
                     .accessibilityLabel("Zones")
+                Button { showingEverything = true } label: { Image(systemName: "tray.full") }
+                    .buttonStyle(.sk1Key())
+                    .accessibilityLabel("Everything: the last trip and every item this store remembers")
                 if profile.mapsStore {
                     Button { showingMap = true } label: { Image(systemName: "map") }
                         .buttonStyle(.sk1Key(isOn: mapper.isRecording(trip)))
@@ -267,16 +274,8 @@ struct ListScreen: View {
         guard let entry = service.addToList(name, store: store, by: profile.shopper) else { return }
         save()
         draft = ""
-        if let item = entry.item, service.needsZoneGuess(item) { guessZone(for: item) }
-    }
-
-    /// Asks the on-device model for a brand-new item's zone, in the background: adding never waits for it.
-    private func guessZone(for item: Item) {
-        let name = item.displayName, storeName = store.displayName, zones = service.zoneExamples(in: store)
-        Task {
-            let answer = await ZoneGuesser.guess(item: name, store: storeName, zones: zones)
-            if service.applyZoneGuess(answer, to: item) != nil { save() }
-        }
+        // The zone is guessed in the background: adding never waits for it.
+        ZoneGuessing.guessMissing(in: store, context: context)
     }
 
     /// Moves the dragged entry (by its id) to `target`'s place in the list: it gets a position between its new
@@ -321,8 +320,13 @@ struct ListScreen: View {
                 mapper.start(started, gridHeading: store.gridHeading?.doubleValue)
             }
         } else {
+            let bought = trip.map { service.route(of: $0).count } ?? 0
             if let trip, mapper.isRecording(trip) { finishMapping(trip, atCheckout: true) }
             service.finishTrip(at: store, for: profile.shopper)
+            save()
+            // What you bought comes off the list; the trip's review is where to set zones and fix the order.
+            if bought > 0 { showingEverything = true }
+            return
         }
         save()
     }
@@ -359,6 +363,7 @@ struct ListScreen: View {
         case "add": draft = "chi"
         case "zones": showingZones = true
         case "map": showingMap = true
+        case "everything": showingEverything = true
         case "edit": editing = entries.first { $0.displayName == "Coffee beans" }.map(Editing.init)
         default: break
         }
