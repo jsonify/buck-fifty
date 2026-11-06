@@ -34,7 +34,7 @@ xcrun simctl boot "$udid" 2>/dev/null || true
 xcrun simctl bootstatus "$udid" -b
 
 xcodebuild build -project BuckFifty.xcodeproj -scheme BuckFifty -destination "id=$udid" \
-  -derivedDataPath build CODE_SIGNING_ALLOWED=NO OTHER_SWIFT_FLAGS='-warnings-as-errors' | tee build/screenshots-build.log
+  -derivedDataPath build CODE_SIGNING_ALLOWED=NO | tee build/screenshots-build.log
 app=build/Build/Products/Debug-iphonesimulator/BuckFifty.app
 xcrun simctl install "$udid" "$app"
 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 \

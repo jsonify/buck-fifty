@@ -45,3 +45,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.buckfifty
         TARGETED_DEVICE_FAMILY: "1"
+        # The app's own code is warning-free. (Not passed on the command line: that would reach SK1Kit too, which
+        # Xcode builds with warnings suppressed, and the two flags conflict.)
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: YES

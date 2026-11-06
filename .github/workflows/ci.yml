@@ -48,7 +48,7 @@ jobs:
         run: |
           brew install xcodegen
           xcodegen generate
-      # Builds the app for the simulator (warnings are errors), runs it on sample data and screenshots each screen.
+      # Builds the app for the simulator (its warnings are errors), runs it on sample data and screenshots each screen.
       - name: Build, run and screenshot on the iOS Simulator
         run: Scripts/screenshots.sh "$RUNNER_TEMP/screenshots"
       - name: Upload screenshots
