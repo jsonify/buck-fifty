@@ -271,7 +271,7 @@ struct ListScreen: View {
     // MARK: Actions
 
     private func add(_ name: String) {
-        guard let entry = service.addToList(name, store: store, by: profile.shopper) else { return }
+        guard service.addToList(name, store: store, by: profile.shopper) != nil else { return }
         save()
         draft = ""
         // The zone is guessed in the background: adding never waits for it.
