@@ -204,9 +204,13 @@ struct ListScreen: View {
         let rows: [ListRow]
         let zoneNames: [String]
         let zonePositions: [Int: Double]
+        /// At home each zone gets one heading; in the store the list follows the walk, a zone heading each time
+        /// the walk comes back to it.
+        let oneSectionPerZone: Bool
 
         var sections: [ListSection<ListRow>] {
-            ListOrdering.sections(rows, zoneNames: zoneNames, zonePositions: zonePositions)
+            ListOrdering.sections(rows, zoneNames: zoneNames, zonePositions: zonePositions,
+                                  oneSectionPerZone: oneSectionPerZone)
         }
 
         /// The rows still to get, in list order.
@@ -223,7 +227,8 @@ struct ListScreen: View {
         let zonePositions = ListOrdering.zoneAverages(items.map { item in
             (zone: item.storeZone.flatMap { zoneList.firstIndex(of: $0) }, position: item.learnedPosition?.doubleValue)
         })
-        return Arrangement(rows: rows, zoneNames: zoneList.map(\.displayName), zonePositions: zonePositions)
+        return Arrangement(rows: rows, zoneNames: zoneList.map(\.displayName), zonePositions: zonePositions,
+                           oneSectionPerZone: trip == nil)
     }
 
     @ViewBuilder private var list: some View {
