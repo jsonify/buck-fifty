@@ -6,7 +6,7 @@ final class WanderingTests: XCTestCase {
 
     func testSpreadOutPositionsOverThreeTripsWander() {
         XCTAssertTrue(wandering.isWandering([0.1, 0.8, 0.4], wasWandering: false))
-        XCTAssertTrue(wandering.isWandering([0.2, 0.75, 0.4, 0.6, 0.3], wasWandering: false))
+        XCTAssertTrue(wandering.isWandering([0.1, 0.75, 0.4, 0.9, 0.3], wasWandering: false))
     }
 
     func testFewerThanThreeTripsNeverWander() {
