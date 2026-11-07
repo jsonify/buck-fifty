@@ -33,7 +33,8 @@ struct ZoneField: View {
 }
 
 /// Choosing a zone: tap it on the floor plan (when the store's zones have one) or pick it from the list, in walking
-/// order. Either way, one tap chooses and closes.
+/// order. On the map a tap lights the zone and names it at the top (some blocks are too small to label), and tapping
+/// it again or Done closes; in the list one tap chooses and closes.
 struct ZoneChooserSheet: View {
     enum Mode: Hashable { case map, list }
 
@@ -60,9 +61,15 @@ struct ZoneChooserSheet: View {
             }
             if mode == .map, let plan {
                 ZoneMap(plan: plan, zoneNames: zones.map(\.displayName), selected: selection?.displayName) { name in
-                    choose(zones.first { ItemName.normalized($0.displayName) == ItemName.normalized(name) })
+                    let zone = zones.first { ItemName.normalized($0.displayName) == ItemName.normalized(name) }
+                    if zone != nil, zone == selection {
+                        dismiss()
+                    } else {
+                        selection = zone
+                    }
                 }
-                Text("Tap the department it's in. Grey areas aren't zones; the square is the entrance.")
+                Text("Tap the department it's in: the zone lights up and its name shows at the top. Tap it again or "
+                     + "Done to keep it. Grey areas aren't zones; the black mark is the entrance.")
                     .sk1Hint()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
@@ -156,9 +163,9 @@ struct ZoneMap: View {
                     } else {
                         context.fill(shape, with: .color(soft.opacity(0.18)))
                     }
-                    if r.width >= 30 && r.height >= 14 {
+                    if r.width >= 22 && r.height >= 12 {
                         let label = Text(block.label)
-                            .font(.system(size: 9, weight: .semibold))
+                            .font(.system(size: r.width < 50 ? 8 : 9, weight: .semibold))
                             .foregroundStyle(chosen ? Color.white : (isAvailable(block) ? ink : soft))
                         context.draw(label, in: rect.insetBy(dx: 2, dy: 2))
                     }
@@ -175,6 +182,8 @@ struct ZoneMap: View {
             })
         }
         .aspectRatio(plan.aspect, contentMode: .fit)
+        // The whole store on one screen, rather than larger blocks that need scrolling.
+        .frame(maxWidth: .infinity, maxHeight: 600)
         .accessibilityHidden(true)
     }
 }
