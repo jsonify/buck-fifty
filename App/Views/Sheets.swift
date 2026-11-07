@@ -5,13 +5,6 @@ import SK1UI
 import ShoppingCore
 import ShoppingStore
 
-/// The choices for a zone picker: "No zone", then the store's zones in walking order.
-enum ZonePicking {
-    static func options(_ zones: [Zone]) -> [SKPicker<Zone?>.Option] {
-        [SKPicker<Zone?>.Option(nil, "No zone")] + zones.map { SKPicker<Zone?>.Option($0, $0.displayName) }
-    }
-}
-
 /// Edit one entry: its name, zone, how many and a note. The zone belongs to the item, so it sticks next time.
 struct EditEntrySheet: View {
     @ObservedObject var entry: ListEntry
@@ -29,7 +22,7 @@ struct EditEntrySheet: View {
                 SKTextField("Name", text: $name)
             }
             CaptionedField(caption: entry.item?.isZoneGuessed == true ? "Zone · guessed" : "Zone", note: zoneNote) {
-                SKPicker(selection: $zone, options: ZonePicking.options(zones))
+                ZoneField(selection: $zone, zones: zones)
             }
             CaptionedField(caption: "How many") {
                 SKPicker(selection: $quantity, options: quantityOptions)

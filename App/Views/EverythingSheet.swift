@@ -226,7 +226,7 @@ struct EditItemSheet: View {
                 SKTextField("Name", text: $name)
             }
             CaptionedField(caption: item.isZoneGuessed ? "Zone · guessed" : "Zone", note: zoneNote) {
-                SKPicker(selection: $zone, options: ZonePicking.options(zones))
+                ZoneField(selection: $zone, zones: zones)
             }
             Text(positionNote).sk1Hint().fixedSize(horizontal: false, vertical: true)
         } actions: {
