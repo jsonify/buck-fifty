@@ -59,6 +59,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.buckfifty
         CODE_SIGN_ENTITLEMENTS: App/BuckFifty.entitlements
         TARGETED_DEVICE_FAMILY: "1"
+        # The logo, in light, dark and tinted (App/Assets.xcassets, drawn by Scripts/make-icon.py).
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # The app's own code is warning-free. (Not passed on the command line: that would reach SK1Kit too, which
         # Xcode builds with warnings suppressed, and the two flags conflict.)
         SWIFT_TREAT_WARNINGS_AS_ERRORS: YES

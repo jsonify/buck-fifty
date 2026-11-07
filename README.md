@@ -1,5 +1,7 @@
 # Buck Fifty
 
+<img src="docs/logo.png" width="120" alt="The Buck Fifty icon: an olive LCD reading 1.50 over an orange check key">
+
 A shopping list for iPhone that learns the order you walk through the store. Built for Costco runs and shared
 between two people in real time. It uses the SK-1 look from [SK1Kit](https://github.com/jsonify/SK1Kit).
 
@@ -122,6 +124,7 @@ Sharing needs two real iCloud accounts to try out: the simulator can't receive t
 | `Makefile`, `Scripts/dist.sh` | Build, run in the Simulator, install on your iPhone (see below) |
 | `Scripts/screenshots.sh` | Builds the app for the simulator, runs it on sample data and screenshots each screen |
 | `Scripts/sk1-audit.sh` | Lists any native controls that have an SK-1 part (from SK1Kit) |
+| `App/Assets.xcassets`, `Scripts/make-icon.py` | The app icon (light, dark and tinted), drawn in code from SK1Kit's colours: the LCD reads 1.50, over the orange check key. `make-icon.py` explains how to redraw it |
 
 ## Building
 
