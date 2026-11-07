@@ -142,7 +142,7 @@ does.
 | `make screenshots` | Screenshot every screen in light and dark into `screenshots/`, as CI does |
 | `make clean` | Delete `build/`, `dist/` and `screenshots/` |
 
-With more than one iPhone connected, pick one with `DEVICE=<name> make install`. If a build fails, the errors are
+With more than one iPhone connected, pick one with `DEVICE=<name> make install`: any unique part of its name will do, in any case, with straight or curly apostrophes (`DEVICE=kitties make install`). If a build fails, the errors are
 printed and the full log is at `build/dist.log`. `Scripts/dist.sh --help` lists the flags behind these.
 
 The demo store is in memory: `-demo` with `-demoScreen stores|list|restock|add|trip|edit|zones|tour|guide` opens one screen, which is

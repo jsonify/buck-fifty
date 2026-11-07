@@ -6,8 +6,9 @@
 #   Scripts/dist.sh --demo       with --run: open on the sample Costco list instead of your own data
 #   Scripts/dist.sh --install    build for your iPhone (plugged in, or paired over Wi-Fi), install it and open it
 #
-# Flags combine. DEVICE=<name or id> picks the iPhone when more than one is connected. The full xcodebuild log is
-# kept at build/dist.log.
+# Flags combine. DEVICE=<name or id> picks the iPhone when more than one is connected: any unique part of its name
+# will do, in any case, with straight or curly apostrophes (DEVICE=kitties). The full xcodebuild log is kept at
+# build/dist.log.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -43,20 +44,31 @@ try:
     devices = json.load(open(sys.argv[1]))["result"]["devices"]
 except Exception:
     devices = []
-want = os.environ.get("DEVICE", "").lower()
-found = []
+def fold(s):
+    # Case and curly quotes don't matter: an iPhone called "Big Ol’ Kitties" matches DEVICE="big ol' kitties".
+    return s.replace("\u2019", "'").replace("\u2018", "'").replace("\u201c", '"').replace("\u201d", '"').lower().strip()
+want = fold(os.environ.get("DEVICE", ""))
+phones = []
 for d in devices:
     hw, props, conn = d.get("hardwareProperties", {}), d.get("deviceProperties", {}), d.get("connectionProperties", {})
     if hw.get("platform") != "iOS" or conn.get("tunnelState") == "unavailable":
         continue
-    ids = {d.get("identifier", "").lower(), hw.get("udid", "").lower(), props.get("name", "").lower()}
-    if want and want not in ids:
-        continue
-    found.append((d["identifier"], props.get("name", "iPhone")))
-if not found:
+    ids = [fold(d.get("identifier", "")), fold(hw.get("udid", "")), fold(props.get("name", ""))]
+    phones.append((d["identifier"], props.get("name", "iPhone"), ids))
+if not phones:
     sys.exit("No iPhone found. Plug it in (or pair it in Xcode > Window > Devices and Simulators), unlock it, and try again.")
-if len(found) > 1 and not want:
-    sys.exit("More than one iPhone: pick one with DEVICE=<name>: " + ", ".join(n for _, n in found))
+names = ", ".join(n for _, n, _ in phones)
+if want:
+    # The name or id exactly, else any phone whose name has it in it ("kitties").
+    found = [p for p in phones if want in p[2]] or [p for p in phones if want in p[2][2]]
+    if not found:
+        sys.exit(f"No iPhone matches DEVICE={os.environ['DEVICE']}. Connected: {names}")
+    if len(found) > 1:
+        sys.exit(f"DEVICE={os.environ['DEVICE']} matches more than one iPhone: " + ", ".join(n for _, n, _ in found))
+else:
+    found = phones
+if len(found) > 1:
+    sys.exit("More than one iPhone: pick one with DEVICE=<name> (part of the name will do): " + names)
 print(found[0][0])
 print(f"iPhone: {found[0][1]}", file=sys.stderr)
 PY
