@@ -21,6 +21,11 @@ final class AppModel {
         if Launch.isDemo {
             profile.name = "Jason"
             profile.mapsStore = true
+            // Two features tried, so Milestones shows some ticked; the -levels screens show the Levels style.
+            profile.markTried(Milestones.Try.restock)
+            profile.markTried(Milestones.Try.everything)
+            profile.forgetSeenMilestones()
+            profile.milestoneStyle = Launch.demoScreen.hasSuffix("-levels") ? .levels : .checklist
         }
         self.profile = profile
         persistence = AppData.makePersistence(shopper: profile.shopper)

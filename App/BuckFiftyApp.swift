@@ -26,7 +26,7 @@ struct RootView: View {
     @State private var path: [ListRoute] = []
     /// The tour, on first launch.
     @State private var showingTour = false
-    /// The guide (only opened from here by the screenshot demo; Help on the home screen opens it otherwise).
+    /// The guide (only opened from here by the screenshot demo; Settings opens it otherwise).
     @State private var showingGuide = false
 
     /// Posted when another device's changes (or a newly accepted share) are merged in.
@@ -46,9 +46,9 @@ struct RootView: View {
             } else if !profile.hasSeenTour {
                 showingTour = true
             }
-            // The screenshot demo opens straight onto the Costco list, except for the home screen, the tour and the
-            // guide.
-            guard Launch.isDemo, !["stores", "tour", "guide"].contains(Launch.demoScreen), path.isEmpty,
+            // The screenshot demo opens straight onto the Costco list, except for the home screen and what opens from
+            // it.
+            guard Launch.isDemo, !Launch.homeScreens.contains(Launch.demoScreen), path.isEmpty,
                   let costco = stores.first else { return }
             path = [ListRoute(store: costco, mode: Launch.demoScreen == "restock" ? .restock : .list)]
         }

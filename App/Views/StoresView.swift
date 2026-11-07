@@ -7,8 +7,9 @@ import ShoppingStore
 
 /// The home screen: a dashboard for the next trip. The LCD says which store is next and how much is on its list; a
 /// week strip shows the days you shopped and the day the next trip probably is; the tiles go shopping or restock;
-/// then what's running low at every store (one tap puts it on its list), each store with its rhythm, and the last
-/// month's trips in numbers, and Help: the tour and the guide.
+/// then what just switched on (milestones, once), what's running low at every store (one tap puts it on its list),
+/// each store with its rhythm, what's coming up (milestones, as a checklist or a level) and the last month's trips in
+/// numbers. Settings has your name, the tour and the guide.
 struct StoresView: View {
     @Binding var path: [ListRoute]
     @Environment(\.managedObjectContext) private var context
@@ -19,9 +20,9 @@ struct StoresView: View {
     @FetchRequest(fetchRequest: Fetch.entries()) private var entries: FetchedResults<ListEntry>
     @FetchRequest(fetchRequest: Fetch.trips()) private var trips: FetchedResults<Trip>
     @State private var showingNewStore = false
-    @State private var showingProfile = false
-    @State private var showingTour = false
-    @State private var showingGuide = false
+    @State private var showingSettings = false
+    @State private var showingMilestones = false
+    @State private var guide: GuideJump?
 
     private var service: ListService { ListService(context: context) }
 
@@ -36,13 +37,18 @@ struct StoresView: View {
                     WeekStrip(shopped: shoppedDays, nextTrip: focus?.rhythm.nextTrip, now: now)
                     tiles(focus)
                 }
-                runningLow(glances, now: now)
-                storeList(glances, now: now)
-                lastMonth(now: now)
-                SKKeyGroup(caption: "Help") {
-                    SKCaptionedKey("Tour", systemImage: "play.rectangle") { showingTour = true }
-                    SKCaptionedKey("Guide", systemImage: "book") { showingGuide = true }
+                if let store = focus?.store {
+                    let milestones = MilestoneBoard.milestones(for: store, context: context, profile: profile,
+                                                               sharing: sharing)
+                    newMilestones(milestones, store: store)
+                    runningLow(glances, now: now)
+                    storeList(glances, now: now)
+                    comingUp(milestones, store: store)
+                } else {
+                    runningLow(glances, now: now)
+                    storeList(glances, now: now)
                 }
+                lastMonth(now: now)
             }
             .padding(16)
         }
@@ -50,9 +56,14 @@ struct StoresView: View {
         .navigationTitle("Buck Fifty")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingNewStore) { NewStoreSheet() }
-        .sheet(isPresented: $showingProfile) { ProfileSheet() }
-        .sheet(isPresented: $showingGuide) { GuideSheet() }
-        .fullScreenCover(isPresented: $showingTour) { TourSheet() }
+        .sheet(isPresented: $showingSettings) { SettingsSheet(store: focus?.store) }
+        .sheet(isPresented: $showingMilestones) { MilestonesSheet(store: focus?.store) }
+        .sheet(item: $guide) { GuideSheet(startAt: $0.id) }
+        .onAppear {
+            guard Launch.isDemo else { return }
+            showingSettings = Launch.demoScreen == "settings"
+            showingMilestones = Launch.demoScreen.hasPrefix("milestones")
+        }
     }
 
     // MARK: What each store looks like right now
@@ -120,7 +131,7 @@ struct StoresView: View {
         return "NO TRIPS YET"
     }
 
-    /// The main actions: go shopping at the store in focus (orange), restock it, add a store, and you.
+    /// The main actions: go shopping at the store in focus (orange), restock it, add a store, and settings.
     private func tiles(_ focus: Glance?) -> some View {
         SKWell {
             HStack(spacing: 4) {
@@ -135,12 +146,70 @@ struct StoresView: View {
                 } else {
                     SKTile("New store", systemImage: "plus", variant: .orange) { showingNewStore = true }
                 }
-                SKTile(profile.name.isEmpty ? "You" : profile.name, systemImage: "person.crop.circle") {
-                    showingProfile = true
-                }
+                SKTile("Settings", systemImage: "gearshape") { showingSettings = true }
             }
             .padding(6)
         }
+    }
+
+    // MARK: Milestones
+
+    /// What just switched on at the store in focus, announced once.
+    @ViewBuilder private func newMilestones(_ milestones: [Milestone], store: Store) -> some View {
+        let new = milestones.filter { $0.kind == .earned && $0.isDone && !profile.hasSeen($0, of: store) }
+        if !new.isEmpty {
+            NewMilestones(store: store, milestones: new, onGuide: { guide = GuideJump(id: $0) },
+                          onDismiss: { profile.markSeen(new, of: store) })
+        }
+    }
+
+    /// What's coming at the store in focus: the next few milestones (Checklist), or the level and the next one
+    /// (Levels). Either opens Milestones.
+    @ViewBuilder private func comingUp(_ milestones: [Milestone], store: Store) -> some View {
+        let done = milestones.filter(\.isDone).count
+        let next = Milestones.upNext(milestones)
+        switch profile.milestoneStyle {
+        case .checklist:
+            SKGroup(caption: "Coming up · \(done) of \(milestones.count)",
+                    note: next.isEmpty ? "Every feature is on at \(store.displayName)."
+                        : "What Buck Fifty learns next at \(store.displayName), and features to try. Tap one for how "
+                            + "it works.") {
+                ForEach(next.prefix(3)) { milestone in
+                    Button { guide = GuideJump(id: milestone.guidePart) } label: { MilestoneRow(milestone: milestone) }
+                        .buttonStyle(.plain)
+                }
+                allMilestones(done: done, total: milestones.count)
+            }
+        case .levels:
+            let level = Milestones.level(done: done, of: milestones.count)
+            SKGroup(caption: "Your level at \(store.displayName)",
+                    note: "It goes up as Buck Fifty learns the store and you try what it can do.") {
+                Button { showingMilestones = true } label: {
+                    LevelMeter(level: level, total: milestones.count)
+                        .padding(.vertical, 8)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens Milestones")
+                if let first = next.first {
+                    Button { guide = GuideJump(id: first.guidePart) } label: { MilestoneRow(milestone: first) }
+                        .buttonStyle(.plain)
+                }
+                allMilestones(done: done, total: milestones.count)
+            }
+        }
+    }
+
+    private func allMilestones(done: Int, total: Int) -> some View {
+        Button { showingMilestones = true } label: {
+            SKRow(title: "All milestones", subtitle: "What it's learned, what's next, and what to try") {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .sk1Ink(soft: true)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: Running low
@@ -383,20 +452,55 @@ struct NewStoreSheet: View {
     }
 }
 
-/// Your name, as the people you share a list with see it.
-struct ProfileSheet: View {
+/// Settings: your name, how milestones show on home and all of them, the tour and the guide, and Map the store.
+struct SettingsSheet: View {
+    /// The store milestones open on.
+    let store: Store?
     @Environment(Profile.self) private var profile
-    @Environment(SharingModel.self) private var sharing
     @Environment(\.dismiss) private var dismiss
+    @State private var showingTour = false
+    @State private var showingGuide = false
+    @State private var showingMilestones = false
 
     var body: some View {
         @Bindable var profile = profile
-        SheetScaffold(title: "You", detail: profile.shopper.initials) {
+        SheetScaffold(title: "Settings", detail: profile.shopper.initials) {
             CaptionedField(caption: "Your name",
                            note: "Shown next to what you add and check off, and on your trips.") {
                 SKTextField("Your name", text: $profile.name, prompt: "Jason")
                     .textContentType(.givenName)
                     .onSubmit { dismiss() }
+            }
+            SKGroup(caption: "Milestones", note: styleNote) {
+                SKRow(title: "On home") {
+                    SKSegmented(selection: $profile.milestoneStyle, options: [
+                        SKSegmented<MilestoneStyle>.Option(.checklist, "Checklist", help: "The next few, with progress"),
+                        SKSegmented<MilestoneStyle>.Option(.levels, "Levels", help: "A level that rises"),
+                    ], height: 30)
+                }
+                Button { showingMilestones = true } label: {
+                    SKRow(title: "All milestones", subtitle: "What it's learned, what's next, and what to try") {
+                        Image(systemName: "flag.2.crossed").font(.system(size: 14, weight: .medium)).sk1Ink(soft: true)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            SKGroup(caption: "Help") {
+                Button { showingTour = true } label: {
+                    SKRow(title: "Tour", subtitle: "A page for every part of the app") {
+                        Image(systemName: "play.rectangle").font(.system(size: 14, weight: .medium)).sk1Ink(soft: true)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Button { showingGuide = true } label: {
+                    SKRow(title: "Guide", subtitle: "Every part of the app and every key, to look up") {
+                        Image(systemName: "book").font(.system(size: 14, weight: .medium)).sk1Ink(soft: true)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             SKGroup(caption: "Experimental", note: mappingNote) {
                 SKRow(title: "Map the store", subtitle: "Builds a floor plan from your trips") {
@@ -412,6 +516,18 @@ struct ProfileSheet: View {
         } actions: {
             Spacer()
             Button("Done") { dismiss() }.buttonStyle(.sk1Key(.orange))
+        }
+        .sheet(isPresented: $showingGuide) { GuideSheet() }
+        .sheet(isPresented: $showingMilestones) { MilestonesSheet(store: store) }
+        .fullScreenCover(isPresented: $showingTour) { TourSheet() }
+    }
+
+    private var styleNote: String {
+        switch profile.milestoneStyle {
+        case .checklist:
+            return "Home shows what Buck Fifty learns next and features to try, each with how far along it is."
+        case .levels:
+            return "Home shows your level, which goes up as Buck Fifty learns the store and you try its features."
         }
     }
 
