@@ -6,8 +6,8 @@ import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
 /// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zone (the zone map),
-/// zones, map, everything, restock, tour, guide, settings, milestones, or stores-levels and milestones-levels (the
-/// home screen and Milestones in the Levels style).
+/// zones, map, everything, restock, tour, guide, settings, milestones, stores-checklist (home scrolled to Coming
+/// up), or stores-levels and milestones-levels (home and Milestones in the Levels style).
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }
@@ -16,8 +16,8 @@ enum Launch {
         return arguments[i + 1]
     }
     /// The demo screens on or over the home screen, rather than the Costco list.
-    static let homeScreens: Set<String> = ["stores", "stores-levels", "tour", "guide", "settings", "milestones",
-                                           "milestones-levels"]
+    static let homeScreens: Set<String> = ["stores", "stores-checklist", "stores-levels", "tour", "guide", "settings",
+                                           "milestones", "milestones-levels"]
 }
 
 /// Who is using this phone. The id is made once and kept; the name is what the other person sees on a shared list.

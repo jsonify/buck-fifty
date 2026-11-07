@@ -30,27 +30,35 @@ struct StoresView: View {
         let now = Date()
         let glances = stores.map { glance($0, now: now) }
         let focus = focusGlance(glances)
-        ScrollView {
-            VStack(alignment: .leading, spacing: SK1.Metrics.groupSpacing) {
-                VStack(spacing: 10) {
-                    hero(focus, now: now)
-                    WeekStrip(shopped: shoppedDays, nextTrip: focus?.rhythm.nextTrip, now: now)
-                    tiles(focus)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: SK1.Metrics.groupSpacing) {
+                    VStack(spacing: 10) {
+                        hero(focus, now: now)
+                        WeekStrip(shopped: shoppedDays, nextTrip: focus?.rhythm.nextTrip, now: now)
+                        tiles(focus)
+                    }
+                    if let store = focus?.store {
+                        let milestones = MilestoneBoard.milestones(for: store, context: context, profile: profile,
+                                                                   sharing: sharing)
+                        newMilestones(milestones, store: store)
+                        runningLow(glances, now: now)
+                        storeList(glances, now: now)
+                        comingUp(milestones, store: store)
+                            .id(Self.comingUpID)
+                    } else {
+                        runningLow(glances, now: now)
+                        storeList(glances, now: now)
+                    }
+                    lastMonth(now: now)
                 }
-                if let store = focus?.store {
-                    let milestones = MilestoneBoard.milestones(for: store, context: context, profile: profile,
-                                                               sharing: sharing)
-                    newMilestones(milestones, store: store)
-                    runningLow(glances, now: now)
-                    storeList(glances, now: now)
-                    comingUp(milestones, store: store)
-                } else {
-                    runningLow(glances, now: now)
-                    storeList(glances, now: now)
-                }
-                lastMonth(now: now)
+                .padding(16)
             }
-            .padding(16)
+            .onAppear {
+                // The screenshot demo's -checklist and -levels home screens show Coming up, below the fold otherwise.
+                guard Launch.isDemo, ["stores-checklist", "stores-levels"].contains(Launch.demoScreen) else { return }
+                DispatchQueue.main.async { proxy.scrollTo(Self.comingUpID, anchor: .center) }
+            }
         }
         .sk1Chassis()
         .navigationTitle("Buck Fifty")
@@ -153,6 +161,8 @@ struct StoresView: View {
     }
 
     // MARK: Milestones
+
+    private static let comingUpID = "comingUp"
 
     /// What just switched on at the store in focus, announced once.
     @ViewBuilder private func newMilestones(_ milestones: [Milestone], store: Store) -> some View {
