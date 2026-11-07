@@ -9,6 +9,21 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
 
 ## What's here
 
+- **Home: the next trip at a glance.** The LCD names the store you're most likely to shop next (the one you or the
+  other person is in, else the one with the most running low), how much is on its list, and when the next trip
+  probably is. Under it a week strip on the glass shows the days you shopped and NEXT on the day the next trip is due.
+  The tiles go shopping (orange) or straight to Restock. Then everything running low at every store, each with
+  **Add** (or **Add all**), each store with its count, what's low and its next trip, a teal lamp while someone is in
+  it, and the last 30 days in numbers: trips, things bought, the average trip and the last one.
+- **Restock: the checklist for next time.** On a list, the switch under the keys flips between what's on the list and
+  Restock: everything the store remembers, ticked if it's on the list. Each check-off is a purchase with a date, so
+  every item has a rhythm (the median days between buying it) and the store has one too (the median days between
+  trips, which says when the next trip is). Items that will run out before the next trip come first (**Before the
+  next trip**, chipped DUE, or LATE when half a rhythm past due), then **Running low soon** (due the trip after
+  next), then **Staples** (bought on half the trips or more since the first time), then **Now and then**. Tap to tick
+  one onto the list, or **Add N due** for all of them; at home the list itself starts with a strip of keys for what's
+  running low. Purchases and trips count by day, so two people splitting up in the store count once. The logic is
+  `Restock` in `ShoppingCore`; `ListService.restockLines(in:)` feeds it the check-offs.
 - **Lists per store.** A new store called Costco starts with zones in walking order: entrance electronics, center
   tables, paper goods, pantry aisles, meat, the back cooler wall, frozen, bakery, then the rotisserie corner by the
   checkout. You can add, delete and reorder them (hold a zone in the Zones sheet and drag it, or use its arrows), or
@@ -126,7 +141,7 @@ does.
 With more than one iPhone connected, pick one with `DEVICE=<name> make install`. If a build fails, the errors are
 printed and the full log is at `build/dist.log`. `Scripts/dist.sh --help` lists the flags behind these.
 
-The demo store is in memory: `-demo` with `-demoScreen stores|list|add|trip|edit|zones` opens one screen, which is
+The demo store is in memory: `-demo` with `-demoScreen stores|list|restock|add|trip|edit|zones` opens one screen, which is
 what the screenshots use.
 
 ## CI
