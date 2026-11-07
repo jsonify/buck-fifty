@@ -12,12 +12,14 @@ public struct ListService {
     public let context: NSManagedObjectContext
     public var policy: TripPolicy
     public var learning: RouteLearning
+    public var wandering: Wandering
 
     public init(context: NSManagedObjectContext, policy: TripPolicy = TripPolicy(),
-                learning: RouteLearning = RouteLearning()) {
+                learning: RouteLearning = RouteLearning(), wandering: Wandering = Wandering()) {
         self.context = context
         self.policy = policy
         self.learning = learning
+        self.wandering = wandering
     }
 
     // MARK: Stores and zones
@@ -397,6 +399,9 @@ public struct ListService {
             item.learnedPosition = next.position.map { NSNumber(value: $0) }
             item.positionSampleCount = Int64(next.sampleCount)
             item.recentPositions = LearnedPosition.encode(next.recent)
+            // Still learning while it wanders, so it goes back into the sort once it settles.
+            let wanders = wandering.isWandering(next.recent, wasWandering: item.isWandering)
+            if item.isWandering != wanders { item.isWandering = wanders }
             if let timeSample = byTime[item] {
                 item.learnedTimePosition = NSNumber(value: learning.smoothed(item.learnedTimePosition?.doubleValue,
                                                                              with: timeSample))
@@ -405,10 +410,22 @@ public struct ListService {
         return byRank.count
     }
 
-    /// The average learned position of each of the store's zones that has any (for items not learned yet).
+    /// Sets "This moves around" (`.wanders`) or "This has a fixed spot" (`.fixed`) on `item`, or nil to go by what
+    /// the trips say. It's on the item, so it's shared with the list.
+    public func setWanderOverride(_ choice: WanderOverride?, for item: Item) {
+        if item.wanderOverride != choice?.rawValue { item.wanderOverride = choice?.rawValue }
+    }
+
+    /// Where a wandering item has been seen, for its row (see `Wandering.note`).
+    public func wanderNote(for item: Item) -> String? {
+        wandering.note(item.learned.recent)
+    }
+
+    /// The average learned position of each of the store's zones that has any (for items not learned yet). Items
+    /// that wander are left out: their positions say nothing about their zone's place in the walk.
     public func zonePositions(in store: Store) -> [Zone: Double] {
         let zones = store.sortedZones
-        let averages = ListOrdering.zoneAverages((store.items ?? []).filter { !$0.isDeleted }.map { item in
+        let averages = ListOrdering.zoneAverages((store.items ?? []).filter { !$0.isDeleted && !$0.wanders }.map { item in
             (zone: item.storeZone.flatMap { zones.firstIndex(of: $0) }, position: item.learnedPosition?.doubleValue)
         })
         var result: [Zone: Double] = [:]

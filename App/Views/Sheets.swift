@@ -15,6 +15,7 @@ struct EditEntrySheet: View {
     @State private var zone: Zone?
     @State private var quantity: Int64 = 1
     @State private var note = ""
+    @State private var spot: WanderOverride?
 
     var body: some View {
         SheetScaffold(title: "Edit item", detail: entry.addedByName.map { "ADDED BY \($0.uppercased())" } ?? "") {
@@ -24,6 +25,7 @@ struct EditEntrySheet: View {
             CaptionedField(caption: entry.item?.isZoneGuessed == true ? "Zone · guessed" : "Zone", note: zoneNote) {
                 ZoneField(selection: $zone, zones: zones)
             }
+            SpotField(selection: $spot, tripsSayWanders: entry.item?.isWandering == true)
             CaptionedField(caption: "How many") {
                 SKPicker(selection: $quantity, options: quantityOptions)
             }
@@ -41,6 +43,7 @@ struct EditEntrySheet: View {
             zone = entry.item?.storeZone
             quantity = max(entry.quantity, 1)
             note = entry.note ?? ""
+            spot = entry.item?.wanderChoice
         }
     }
 
@@ -64,6 +67,7 @@ struct EditEntrySheet: View {
             } else {
                 service.confirmZone(of: item)
             }
+            service.setWanderOverride(spot, for: item)
         }
         entry.quantity = quantity
         let cleanedNote = ItemName.cleaned(note)

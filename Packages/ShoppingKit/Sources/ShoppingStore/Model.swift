@@ -52,8 +52,10 @@ public final class Item: NSManagedObject {
     @NSManaged public var learnedTimePosition: NSNumber?
     /// The warehouse item number from a shelf tag (issue #6).
     @NSManaged public var itemNumber: String?
-    /// Never settles into one position (issue #8).
+    /// The trips say it never settles into one position (issue #8; `Wandering`). See `wanders` for what the list uses.
     @NSManaged public var isWandering: Bool
+    /// "This moves around" or "This has a fixed spot", set by hand; nil to go by the trips. See `WanderOverride`.
+    @NSManaged public var wanderOverride: String?
     /// How the zone was set: "manual" (by hand, also for "no zone"), or "guessed" by the on-device model (issue #4);
     /// nil when nobody has set or guessed one. See `ZoneSource`.
     @NSManaged public var zoneSource: String?
@@ -180,6 +182,7 @@ public enum ShoppingModel {
             attribute("learnedTimePosition", .doubleAttributeType),
             attribute("itemNumber", .stringAttributeType),
             attribute("isWandering", .booleanAttributeType, default: false),
+            attribute("wanderOverride", .stringAttributeType),
             attribute("zoneSource", .stringAttributeType),
             attribute("createdAt", .dateAttributeType),
         ]
@@ -271,6 +274,10 @@ extension Item {
     public var displayName: String { name ?? "" }
     /// Whether the item's zone is the on-device model's guess, not yet confirmed.
     public var isZoneGuessed: Bool { storeZone != nil && zoneSource == ZoneSource.guessed }
+    /// The hand-set answer to whether it wanders, if any.
+    public var wanderChoice: WanderOverride? { wanderOverride.flatMap(WanderOverride.init(rawValue:)) }
+    /// Whether it goes in Look for it at the top of the list: set by hand, or flagged by the trips.
+    public var wanders: Bool { Wandering.effective(learned: isWandering, override: wanderChoice) }
     /// What the store has learned about where the item is.
     public var learned: LearnedPosition {
         LearnedPosition(position: learnedPosition?.doubleValue, sampleCount: Int(positionSampleCount),

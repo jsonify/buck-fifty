@@ -65,6 +65,7 @@ struct Entry: ListSortable, Equatable {
     var zoneIndex: Int?
     var isChecked = false
     var learnedPosition: Double?
+    var isWandering = false
 }
 
 final class ListOrderingTests: XCTestCase {

@@ -12,6 +12,7 @@ struct ListRow: ListSortable {
     var learnedPosition: Double? { entry.item?.learnedPosition?.doubleValue }
     var sortName: String { entry.displayName }
     var isChecked: Bool { entry.isChecked }
+    var isWandering: Bool { entry.item?.wanders == true }
 }
 
 /// The entry the edit sheet is open on. Core Data objects aren't Identifiable here, so `sheet(item:)` gets this.
@@ -213,9 +214,11 @@ struct ListScreen: View {
                                   oneSectionPerZone: oneSectionPerZone)
         }
 
-        /// The rows still to get, in list order.
+        /// The rows still to get in the walk, in list order (not the ones under Look for it: they're not in the walk,
+        /// so they can't be dragged into it).
         var unchecked: [ListRow] {
-            ListOrdering.sorted(rows, zoneCount: zoneNames.count, zonePositions: zonePositions).filter { !$0.isChecked }
+            ListOrdering.sorted(rows, zoneCount: zoneNames.count, zonePositions: zonePositions)
+                .filter { !$0.isChecked && !$0.isWandering }
         }
     }
 
@@ -224,7 +227,7 @@ struct ListScreen: View {
         let rows = entries.map { entry in
             ListRow(entry: entry, zoneIndex: entry.item?.storeZone.flatMap { zoneList.firstIndex(of: $0) })
         }
-        let zonePositions = ListOrdering.zoneAverages(items.map { item in
+        let zonePositions = ListOrdering.zoneAverages(items.filter { !$0.wanders }.map { item in
             (zone: item.storeZone.flatMap { zoneList.firstIndex(of: $0) }, position: item.learnedPosition?.doubleValue)
         })
         return Arrangement(rows: rows, zoneNames: zoneList.map(\.displayName), zonePositions: zonePositions,
@@ -239,10 +242,11 @@ struct ListScreen: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         ForEach(sections, id: \.id) { section in
-            SKGroup(caption: section.title) {
+            SKGroup(caption: section.title, note: section.kind == .lookForIt ? lookForItNote : nil) {
                 ForEach(section.entries, id: \.entry.objectID) { row in
                     EntryRow(entry: row.entry, me: profile.id, showsWho: share.isShared,
                              guessedZone: row.entry.item?.isZoneGuessed == true,
+                             lookFor: lookFor(row),
                              toggle: { toggle(row.entry) },
                              edit: { editing = Editing(entry: row.entry) },
                              remove: { remove(row.entry) })
@@ -265,6 +269,19 @@ struct ListScreen: View {
                 }
             }
         }
+    }
+
+    /// Under Look for it: why these are at the top.
+    private var lookForItNote: String {
+        "These move around the store, so they're not in the walk. Keep an eye out for them."
+    }
+
+    /// Where an item under Look for it has been seen, or nil for every other row.
+    private func lookFor(_ row: ListRow) -> String? {
+        guard !row.isChecked, row.isWandering, let item = row.entry.item else { return nil }
+        let seen = service.wanderNote(for: item) ?? "Moves around"
+        if let zone = item.storeZone?.displayName { return "\(seen) · \(zone)" }
+        return seen
     }
 
     // MARK: Restock
@@ -489,6 +506,8 @@ struct EntryRow: View {
     let showsWho: Bool
     /// Whether the item's zone is the on-device model's guess (shown as a chip that opens the editor).
     let guessedZone: Bool
+    /// Where a wandering item has been seen (under Look for it); nil for the rest.
+    var lookFor: String?
     let toggle: () -> Void
     let edit: () -> Void
     let remove: () -> Void
@@ -531,6 +550,7 @@ struct EntryRow: View {
     /// The note, and on a shared list who added it or has it in their cart when that isn't you.
     private var detail: String? {
         var parts: [String] = []
+        if let lookFor { parts.append(lookFor) }
         if let note = entry.note, !note.isEmpty { parts.append(note) }
         if showsWho {
             if entry.isChecked, let id = entry.checkedByID, id != me, let name = entry.checkedByName {

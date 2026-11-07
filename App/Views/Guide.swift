@@ -62,7 +62,9 @@ enum Guide {
             points: [
                 "Type in the field to add something. Things the store remembers come up as you type, with their zone: "
                     + "tap one to add it. Adding something that's already on the list adds one more (×2).",
-                "Tap a row to check it off. Hold a row to edit its name, zone, how many and a note, or to remove it.",
+                "Tap a row to check it off. Hold a row to edit its name, zone, spot, how many and a note, or to "
+                    + "remove it.",
+                "Look for it, at the top, holds things that move around the store, with where they've been seen.",
                 "Hold an item and drag it onto another: it takes that one's place in the walk, and its zone. The "
                     + "list remembers where you put it.",
                 "At home each zone has one heading. In the store the list follows your walk, so a zone can come round "
@@ -140,6 +142,12 @@ enum Guide {
                     + "with fewer than two check-offs teaches nothing.",
                 "Not learned yet, an item goes by its zone's average, then its zone's place in the walking order. "
                     + "Items with no zone go last.",
+                "Some things never stay put, like seasonal and treasure-hunt finds. When three or more trips find "
+                    + "something all over the store, it moves to Look for it at the top of the list, with where it's "
+                    + "been seen (anywhere from 20% to 75% of the way in, last at 40%). Once three trips in a row "
+                    + "agree, it goes back into the walk.",
+                "Spot, in an item's editor, decides it yourself: Moves around keeps it under Look for it, Fixed spot "
+                    + "keeps it in the walk, Learn it goes by the trips. It's shared like the rest of the list.",
             ]),
         GuidePart(
             id: "everything", title: "Everything", systemImage: "tray.full",
@@ -380,10 +388,16 @@ private struct TourPicture: View {
                 }
             }
         case "learning":
-            SKGroup(caption: "Last trip, in the order checked off") {
-                SKRow(title: "Bananas", subtitle: "1st of 5") { SKChip("0.00", minWidth: 52) }
-                SKRow(title: "Olive oil", subtitle: "3rd of 5") { SKChip("0.50", minWidth: 52) }
-                SKRow(title: "Rotisserie chicken", subtitle: "5th of 5") { SKChip("1.00", minWidth: 52) }
+            VStack(spacing: 10) {
+                SKGroup(caption: "Last trip, in the order checked off") {
+                    SKRow(title: "Bananas", subtitle: "1st of 5") { SKChip("0.00", minWidth: 52) }
+                    SKRow(title: "Olive oil", subtitle: "3rd of 5") { SKChip("0.50", minWidth: 52) }
+                    SKRow(title: "Rotisserie chicken", subtitle: "5th of 5") { SKChip("1.00", minWidth: 52) }
+                }
+                SKGroup(caption: "Look for it") {
+                    SampleRow(title: "Advent calendar", subtitle: "Seen anywhere from 15% to 80% of the way in",
+                              checked: false, chip: nil)
+                }
             }
         case "sharing":
             SKDisplay(title: "At home", detail: "SAM IN STORE", message: "Ready", number: 9, digits: 3, unit: "LEFT")

@@ -1,6 +1,7 @@
 import SwiftUI
 import SK1Tokens
 import SK1UI
+import ShoppingCore
 
 /// Text in the palette's ink, or its soft ink.
 struct InkStyle: ViewModifier {
@@ -57,6 +58,36 @@ struct CaptionedField<Field: View>: View {
             if let note {
                 Text(note).sk1Hint().fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+}
+
+/// Whether an item has a spot in the walk (issue #8): go by the trips, "Moves around" (always under Look for it at
+/// the top of the list) or "Fixed spot" (always in the walk). Both item editors use it.
+struct SpotField: View {
+    @Binding var selection: WanderOverride?
+    /// Whether the trips say it wanders.
+    let tripsSayWanders: Bool
+
+    var body: some View {
+        CaptionedField(caption: "Spot", note: note) {
+            SKSegmented(selection: $selection, options: [
+                SKSegmented<WanderOverride?>.Option(nil, "Learn it", help: "Go by where trips find it"),
+                SKSegmented<WanderOverride?>.Option(.wanders, "Moves around", help: "Always under Look for it"),
+                SKSegmented<WanderOverride?>.Option(.fixed, "Fixed spot", help: "Always in the walk"),
+            ], height: 30)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var note: String {
+        switch selection {
+        case .wanders: return "Always under Look for it at the top of the list, with where it's been seen."
+        case .fixed: return "Always in the walk, even when trips find it in different places."
+        case nil:
+            return tripsSayWanders
+                ? "Trips find it all over the store, so it's under Look for it until three trips agree."
+                : "If trips keep finding it in different places, it moves to Look for it at the top of the list."
         }
     }
 }

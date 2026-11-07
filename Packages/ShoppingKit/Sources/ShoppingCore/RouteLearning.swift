@@ -26,10 +26,13 @@ public struct LearnedPosition: Sendable, Equatable {
     }
 
     /// The standard deviation of the recent samples, or nil with fewer than two.
-    public var spread: Double? {
-        guard recent.count >= 2 else { return nil }
-        let mean = recent.reduce(0, +) / Double(recent.count)
-        let variance = recent.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(recent.count)
+    public var spread: Double? { Self.spread(of: recent) }
+
+    /// The standard deviation of `samples`, or nil with fewer than two.
+    public static func spread(of samples: [Double]) -> Double? {
+        guard samples.count >= 2 else { return nil }
+        let mean = samples.reduce(0, +) / Double(samples.count)
+        let variance = samples.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(samples.count)
         return variance.squareRoot()
     }
 
