@@ -7,8 +7,8 @@ import ShoppingStore
 
 /// The home screen: a dashboard for the next trip. The LCD says which store is next and how much is on its list; a
 /// week strip shows the days you shopped and the day the next trip probably is; the tiles go shopping or restock;
-/// then what just switched on (milestones, once), what's running low at every store (one tap puts it on its list),
-/// each store with its rhythm, what's coming up (milestones, as a checklist or a level) and the last month's trips in
+/// then what just switched on (milestones, once) and what's coming up (milestones, as a checklist or a level), what's
+/// running low at every store (one tap puts it on its list), each store with its rhythm, and the last month's trips in
 /// numbers. Settings has your name, the tour and the guide.
 struct StoresView: View {
     @Binding var path: [ListRoute]
@@ -41,11 +41,12 @@ struct StoresView: View {
                     if let store = focus?.store {
                         let milestones = MilestoneBoard.milestones(for: store, context: context, profile: profile,
                                                                    sharing: sharing)
+                        // Up front, while the app is still new: what just switched on, then what's coming.
                         newMilestones(milestones, store: store)
-                        runningLow(glances, now: now)
-                        storeList(glances, now: now)
                         comingUp(milestones, store: store)
                             .id(Self.comingUpID)
+                        runningLow(glances, now: now)
+                        storeList(glances, now: now)
                     } else {
                         runningLow(glances, now: now)
                         storeList(glances, now: now)

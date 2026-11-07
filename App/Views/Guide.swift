@@ -40,13 +40,13 @@ enum Guide {
                     + "low, and when the next trip is, or who's in the store.",
                 "The week strip shows three days back and three ahead. A dot marks the days anything was bought; NEXT "
                     + "marks the day the next trip probably is, from how often you go.",
+                "New at, under the keys, says when Buck Fifty has learned enough to switch something on. Got it "
+                    + "puts it away; each is said once.",
+                "Coming up, under it, shows what it learns next and features to try, or your level, as set in "
+                    + "Settings. See Milestones.",
                 "Running low lists what's due at every store. Add puts one on its store's list; Add all does them all.",
                 "Stores lists each store with what's on its list, what's running low and its next trip. A blinking "
                     + "teal lamp means someone is in that store now. Tap a store to open its list.",
-                "New at, at the top, says when Buck Fifty has learned enough to switch something on. Got it puts it "
-                    + "away; each is said once.",
-                "Coming up shows what it learns next and features to try, or your level, as set in Settings. See "
-                    + "Milestones.",
                 "Last 30 days counts the trips, the things bought, the average trip and the last one.",
             ],
             keys: [
@@ -204,13 +204,13 @@ enum Guide {
                 "Tap a milestone for how it works, here in the guide.",
                 "In Settings, choose how home shows them: Checklist, the next three with how far along each is; or "
                     + "Levels, a level from New in town to Knows the store that goes up as they're done.",
-                "When one switches on, home says so once at the top, under New at.",
+                "When one switches on, home says so once under its keys, in New at.",
             ],
             keys: [
                 GuideKey(systemImage: "flag.2.crossed", name: "All milestones",
                          does: "Every milestone for a store, on home under Coming up and in Settings."),
                 GuideKey(systemImage: "checkmark", name: "Got it",
-                         does: "Puts away what just switched on, at the top of home."),
+                         does: "Puts away what just switched on, under the keys on home."),
             ]),
     ]
 }
