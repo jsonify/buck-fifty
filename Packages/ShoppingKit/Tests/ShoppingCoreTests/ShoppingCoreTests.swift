@@ -117,6 +117,24 @@ final class LearnedOrderTests: XCTestCase {
         XCTAssertEqual(sections.map(\.title).last, ListOrdering.unzonedTitle)
     }
 
+    func testOneSectionPerZoneAtHome() {
+        let entries = [
+            Entry(sortName: "Coffee", zoneIndex: 1, learnedPosition: 0.9),
+            Entry(sortName: "Tea", zoneIndex: 1),
+            Entry(sortName: "Steak", zoneIndex: 2, learnedPosition: 0.5),
+            Entry(sortName: "TV", zoneIndex: 0, learnedPosition: 0.05),
+            Entry(sortName: "Batteries", zoneIndex: nil, learnedPosition: 0.1),
+            Entry(sortName: "Pesto", zoneIndex: nil),
+        ]
+        // The same list as above, but Coffee joins Tea under Pantry and Pesto joins Batteries, each in walk order.
+        let sections = ListOrdering.sections(entries, zoneNames: ["Front", "Pantry", "Meat"], zonePositions: [1: 0.3],
+                                             oneSectionPerZone: true)
+        XCTAssertEqual(sections.map(\.kind), [.zone(0), .unzoned, .zone(1), .zone(2)])
+        XCTAssertEqual(sections.map { $0.entries.map(\.sortName) },
+                       [["TV"], ["Batteries", "Pesto"], ["Tea", "Coffee"], ["Steak"]])
+        XCTAssertEqual(Set(sections.map(\.id)).count, sections.count)
+    }
+
     func testZoneAverages() {
         let averages = ListOrdering.zoneAverages([(zone: 0, position: 0.2), (zone: 0, position: 0.4),
                                                   (zone: 1, position: nil), (zone: nil, position: 0.9)])

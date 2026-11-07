@@ -20,9 +20,10 @@ struct Editing: Identifiable {
     var id: NSManagedObjectID { entry.objectID }
 }
 
-/// One store's list (the main window recipe): the LCD saying what's going on, the trays of keys, the add field, then
-/// the list in zone trays in the order the store is walked (learned from check-offs), with what's in the cart at the
-/// bottom.
+/// One store's list (the main window recipe): the LCD saying what's going on, the trays of keys, a switch between the
+/// list and the restock checklist, the add field, then either the list in zone trays in the order the store is walked
+/// (learned from check-offs), with what's in the cart at the bottom, or Restock: everything the store remembers, with
+/// what's due before the next trip first, one tap each to put on the list.
 struct ListScreen: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
@@ -34,6 +35,8 @@ struct ListScreen: View {
     @FetchRequest private var items: FetchedResults<Item>
     @FetchRequest private var openTrips: FetchedResults<Trip>
     @State private var draft = ""
+    /// The list, or the restock checklist.
+    @State private var mode: ListMode
     @State private var editing: Editing?
     @State private var showingZones = false
     @State private var showingMap = false
@@ -43,8 +46,9 @@ struct ListScreen: View {
     /// The row a dragged item is over: it will take that row's place.
     @State private var dropTarget: NSManagedObjectID?
 
-    init(store: Store) {
+    init(store: Store, mode: ListMode = .list) {
         self.store = store
+        _mode = State(initialValue: mode)
         _entries = FetchRequest(fetchRequest: Fetch.entries(in: store))
         _zones = FetchRequest(fetchRequest: Fetch.zones(in: store))
         _items = FetchRequest(fetchRequest: Fetch.items(in: store))
@@ -65,17 +69,23 @@ struct ListScreen: View {
     }
 
     var body: some View {
+        let restock = service.restockLines(in: store)
+        let needed = restock.filter { $0.urgency.isNeeded && !$0.isOnList }
         VStack(spacing: 10) {
-            display
+            display(needed: needed.count)
             keys
+            modeSwitch(needed: needed.count)
             addBar
             SKGroove()
             ScrollView {
                 VStack(alignment: .leading, spacing: SK1.Metrics.groupSpacing) {
-                    if draftIsBlank {
-                        list
-                    } else {
+                    if !draftIsBlank {
                         suggestionList
+                    } else if mode == .restock {
+                        restockList(restock, needed: needed)
+                    } else {
+                        if trip == nil && !needed.isEmpty { runningLow(needed) }
+                        list
                     }
                 }
                 .padding(.vertical, 6)
@@ -103,11 +113,11 @@ struct ListScreen: View {
 
     // MARK: The LCD and keys
 
-    private var display: some View {
+    private func display(needed: Int) -> some View {
         let left = entries.filter { !$0.isChecked }.count
         return SKDisplay(title: trip == nil ? "At home" : "In the store",
                          detail: detail,
-                         message: message(left: left),
+                         message: message(left: left, needed: needed),
                          number: left, digits: 3, unit: "LEFT", live: trip != nil)
     }
 
@@ -119,11 +129,12 @@ struct ListScreen: View {
     }
 
     /// The LCD's middle column: a few characters fit, so short status only.
-    private func message(left: Int) -> String {
+    private func message(left: Int, needed: Int) -> String {
         if trip != nil {
             let inCart = entries.filter { $0.isChecked && $0.checkedByID == profile.id }.count
             return "\(inCart) in cart"
         }
+        if needed > 0 { return "\(needed) due" }
         if entries.isEmpty { return "Empty" }
         if left == 0 { return "All in" }
         return "Ready"
@@ -160,6 +171,17 @@ struct ListScreen: View {
         }
     }
 
+    /// What's on the list, or the restock checklist; each says how many.
+    private func modeSwitch(needed: Int) -> some View {
+        let left = entries.filter { !$0.isChecked }.count
+        return SKSegmented(selection: $mode, options: [
+            SKSegmented<ListMode>.Option(.list, "On the list", badge: "\(left)"),
+            SKSegmented<ListMode>.Option(.restock, "Restock", badge: needed > 0 ? "\(needed) due" : nil,
+                                         help: "Everything this store remembers, what's due first"),
+        ], height: 30)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var addBar: some View {
         HStack(spacing: 6) {
             SKTextField("Add an item", text: $draft, prompt: "Add to \(store.displayName)…")
@@ -182,9 +204,13 @@ struct ListScreen: View {
         let rows: [ListRow]
         let zoneNames: [String]
         let zonePositions: [Int: Double]
+        /// At home each zone gets one heading; in the store the list follows the walk, a zone heading each time
+        /// the walk comes back to it.
+        let oneSectionPerZone: Bool
 
         var sections: [ListSection<ListRow>] {
-            ListOrdering.sections(rows, zoneNames: zoneNames, zonePositions: zonePositions)
+            ListOrdering.sections(rows, zoneNames: zoneNames, zonePositions: zonePositions,
+                                  oneSectionPerZone: oneSectionPerZone)
         }
 
         /// The rows still to get, in list order.
@@ -201,13 +227,14 @@ struct ListScreen: View {
         let zonePositions = ListOrdering.zoneAverages(items.map { item in
             (zone: item.storeZone.flatMap { zoneList.firstIndex(of: $0) }, position: item.learnedPosition?.doubleValue)
         })
-        return Arrangement(rows: rows, zoneNames: zoneList.map(\.displayName), zonePositions: zonePositions)
+        return Arrangement(rows: rows, zoneNames: zoneList.map(\.displayName), zonePositions: zonePositions,
+                           oneSectionPerZone: trip == nil)
     }
 
     @ViewBuilder private var list: some View {
         let sections = arrangement.sections
         if sections.isEmpty {
-            Text("Nothing on the list. Type above to add something; things you've bought before come back as you type.")
+            Text("Nothing on the list. Type above to add something, or open Restock and tick what you usually buy.")
                 .sk1Hint()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -237,6 +264,77 @@ struct ListScreen: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: Restock
+
+    /// Over the list, at home: what's due before the next trip and isn't on the list, a key each.
+    private func runningLow(_ needed: [RestockLine]) -> some View {
+        VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
+            HStack {
+                SKCaption("Running low · tap to add", tone: .soft)
+                Spacer()
+                if needed.count > 1 {
+                    Button("Add all \(needed.count)", action: addNeeded)
+                        .buttonStyle(.sk1Key(size: .small))
+                }
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(needed, id: \.item.objectID) { line in
+                        Button { toggleOnList(line.item) } label: {
+                            Label(line.item.displayName, systemImage: "plus")
+                        }
+                        .buttonStyle(.sk1Key(size: .small))
+                        .accessibilityLabel("Add \(line.item.displayName)")
+                    }
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    /// The restock checklist: everything the store remembers, in sections from "before the next trip" to "now and
+    /// then". Ticking one puts it on the list; unticking takes it off.
+    @ViewBuilder private func restockList(_ lines: [RestockLine], needed: [RestockLine]) -> some View {
+        if lines.isEmpty {
+            Text("Nothing remembered yet. Everything you add and buy is kept here, a checklist for next time.")
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            HStack(spacing: 12) {
+                Text(needed.isEmpty
+                     ? "Everything due is on the list. Tick anything else you need."
+                     : "Tick what you need. Due is worked out from how often you buy each thing.")
+                    .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                if !needed.isEmpty {
+                    Button("Add \(needed.count) due", action: addNeeded).buttonStyle(.sk1Key())
+                }
+            }
+            let now = Date()
+            ForEach(Restock.Shelf.allCases, id: \.self) { shelf in
+                let shelfLines = lines.filter { $0.shelf == shelf }
+                if !shelfLines.isEmpty {
+                    SKGroup(caption: "\(shelf.title) · \(shelfLines.count)", note: note(for: shelf)) {
+                        ForEach(shelfLines, id: \.item.objectID) { line in
+                            RestockRow(line: line, now: now) { toggleOnList(line.item) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func note(for shelf: Restock.Shelf) -> String? {
+        switch shelf {
+        case .needed: return nil
+        case .soon: return "Due the trip after next."
+        case .staples: return "Bought on most trips. Not due yet, but worth a look."
+        case .rest: return "Everything else this store remembers."
         }
     }
 
@@ -307,6 +405,16 @@ struct ListScreen: View {
         save()
     }
 
+    private func toggleOnList(_ item: Item) {
+        service.toggleOnList(item, by: profile.shopper)
+        save()
+    }
+
+    private func addNeeded() {
+        service.addNeeded(in: store, by: profile.shopper)
+        save()
+    }
+
     private func remove(_ entry: ListEntry) {
         service.remove(entry)
         save()
@@ -314,6 +422,8 @@ struct ListScreen: View {
 
     private func toggleTrip() {
         if trip == nil {
+            // In the store, the list is what matters.
+            mode = .list
             let started = service.startTrip(at: store, for: profile.shopper)
             // Start trip is "start at the door": the origin of the map.
             if profile.mapsStore, StoreMapper.isAvailable, !Launch.isDemo {
@@ -430,5 +540,35 @@ struct EntryRow: View {
             }
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+/// One line of the restock checklist: ticked when it's on the list, its rhythm under its name, and a chip when it's due.
+struct RestockRow: View {
+    let line: RestockLine
+    let now: Date
+    let toggle: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Toggle(isOn: Binding(get: { line.isOnList }, set: { _ in toggle() })) { EmptyView() }
+                .toggleStyle(.sk1Square)
+                .accessibilityLabel(Text(line.item.displayName))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(line.item.displayName)
+                    .font(.sk1(SK1.TypeScale.rowTitle))
+                    .sk1Ink()
+                Text(line.isOnList ? "On the list · \(line.summary(now: now))" : line.summary(now: now))
+                    .sk1Hint()
+            }
+            Spacer(minLength: 8)
+            if !Restock.chip(line.urgency).isEmpty {
+                SKChip(Restock.chip(line.urgency), minWidth: 44)
+            }
+        }
+        .padding(.vertical, 8)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: toggle)
     }
 }

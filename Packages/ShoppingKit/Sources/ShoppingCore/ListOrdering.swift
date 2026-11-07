@@ -90,8 +90,12 @@ public enum ListOrdering {
     /// `entries` in list order under headings: a section for each run of entries in the same zone (titled from
     /// `zoneNames`), runs without a zone, then the checked-off ones. Before anything is learned that is one section
     /// per zone in walking order. Empty sections are left out. A zone index outside `zoneNames` counts as no zone.
+    ///
+    /// With `oneSectionPerZone` (the list at home, when it's read rather than walked), a zone that comes round again
+    /// later in the walk doesn't get a second heading: its entries join its first section, still in walk order.
     public static func sections<E: ListSortable>(_ entries: [E], zoneNames: [String],
-                                                 zonePositions: [Int: Double] = [:]) -> [ListSection<E>] {
+                                                 zonePositions: [Int: Double] = [:],
+                                                 oneSectionPerZone: Bool = false) -> [ListSection<E>] {
         var sections: [ListSection<E>] = []
         var seen: [ListSection<E>.Kind: Int] = [:]
         for entry in sorted(entries, zoneCount: zoneNames.count, zonePositions: zonePositions) {
@@ -105,6 +109,8 @@ public enum ListOrdering {
             }
             if sections.last?.kind == kind {
                 sections[sections.count - 1].entries.append(entry)
+            } else if oneSectionPerZone, let index = sections.firstIndex(where: { $0.kind == kind }) {
+                sections[index].entries.append(entry)
             } else {
                 let title: String
                 switch kind {

@@ -6,7 +6,7 @@ import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
 /// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zone (the zone map),
-/// zones, map or everything.
+/// zones, map, everything or restock.
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }
@@ -111,6 +111,13 @@ enum Fetch {
         return request
     }
 
+    /// Every trip at every store, newest first (the home screen's rhythm and stats).
+    static func trips() -> NSFetchRequest<Trip> {
+        let request = NSFetchRequest<Trip>(entityName: "Trip")
+        request.sortDescriptors = [NSSortDescriptor(key: "startedAt", ascending: false)]
+        return request
+    }
+
     static func openTrips(in store: Store) -> NSFetchRequest<Trip> {
         let request = NSFetchRequest<Trip>(entityName: "Trip")
         request.predicate = NSPredicate(format: "store == %@ AND endedAt == nil", store)
@@ -134,27 +141,39 @@ enum DemoData {
                 service.setZone(match, for: item)
             }
         }
-        // Two earlier trips, so the list is in the order they were walked. The coffee has moved over by the bakery,
-        // and its learned place beats its zone's.
-        let walked = ["AA batteries", "Paper towels", "Toilet paper", "Olive oil", "Peanut butter", "Chicken thighs",
-                      "Eggs", "Greek yogurt", "Milk", "Frozen berries", "Coffee beans", "Croissants",
-                      "Rotisserie chicken"]
-        // Both trips were mapped (issue #5): where each thing was grabbed, in metres from the door, a little apart
+        // Six weekly trips, so the list is in the order they were walked and Restock knows how often each thing is
+        // bought: milk, eggs and bananas every week, paper towels every other week, olive oil once a month. The
+        // coffee has moved over by the bakery, and its learned place beats its zone's.
+        let walked = ["AA batteries", "Bananas", "Paper towels", "Toilet paper", "Sparkling water", "Dish soap",
+                      "Olive oil", "Peanut butter", "Chicken thighs", "Eggs", "Greek yogurt", "Milk", "Butter",
+                      "Frozen berries", "Coffee beans", "Croissants", "Rotisserie chicken"]
+        // Which of the six trips (0 is six weeks ago, 5 last week) bought each thing.
+        let bought: [String: Set<Int>] = [
+            "AA batteries": [2], "Bananas": [0, 1, 2, 3, 4, 5], "Paper towels": [1, 3, 5], "Toilet paper": [0, 3],
+            "Sparkling water": [0, 1, 2, 3, 4, 5], "Dish soap": [0, 3], "Olive oil": [1, 5], "Peanut butter": [0, 4],
+            "Chicken thighs": [1, 3, 5], "Eggs": [0, 1, 2, 3, 4, 5], "Greek yogurt": [1, 3, 5],
+            "Milk": [0, 1, 2, 3, 4, 5], "Butter": [0, 2, 4], "Frozen berries": [1, 3, 5], "Coffee beans": [0, 2, 4],
+            "Croissants": [1, 3, 5], "Rotisserie chicken": [0, 1, 2, 3, 4, 5],
+        ]
+        // The trips were mapped (issue #5): where each thing was grabbed, in metres from the door, a little apart
         // each time, and the walk through them to the checkout.
         let spots: [String: FloorPoint] = [
-            "AA batteries": FloorPoint(x: 6, y: 10), "Paper towels": FloorPoint(x: 52, y: 8),
-            "Toilet paper": FloorPoint(x: 58, y: 10), "Olive oil": FloorPoint(x: 50, y: 36),
-            "Peanut butter": FloorPoint(x: 58, y: 42), "Chicken thighs": FloorPoint(x: 68, y: 74),
-            "Eggs": FloorPoint(x: 44, y: 86), "Greek yogurt": FloorPoint(x: 36, y: 86),
-            "Milk": FloorPoint(x: 28, y: 86), "Frozen berries": FloorPoint(x: 14, y: 74),
+            "AA batteries": FloorPoint(x: 6, y: 10), "Bananas": FloorPoint(x: 20, y: 12),
+            "Paper towels": FloorPoint(x: 52, y: 8), "Toilet paper": FloorPoint(x: 58, y: 10),
+            "Sparkling water": FloorPoint(x: 62, y: 18), "Dish soap": FloorPoint(x: 64, y: 28),
+            "Olive oil": FloorPoint(x: 50, y: 36), "Peanut butter": FloorPoint(x: 58, y: 42),
+            "Chicken thighs": FloorPoint(x: 68, y: 74), "Eggs": FloorPoint(x: 44, y: 86),
+            "Greek yogurt": FloorPoint(x: 36, y: 86), "Milk": FloorPoint(x: 28, y: 86),
+            "Butter": FloorPoint(x: 22, y: 86), "Frozen berries": FloorPoint(x: 14, y: 74),
             "Coffee beans": FloorPoint(x: 12, y: 56), "Croissants": FloorPoint(x: 6, y: 48),
             "Rotisserie chicken": FloorPoint(x: 6, y: 26),
         ]
         costco.gridHeading = 0
-        for (tripNumber, daysAgo) in [14.0, 7.0].enumerated() {
-            let start = Date().addingTimeInterval(-daysAgo * 24 * 60 * 60)
+        for (tripNumber, weeksAgo) in [6.0, 5, 4, 3, 2, 1].enumerated() {
+            let start = Date().addingTimeInterval(-weeksAgo * 7 * 24 * 60 * 60)
             var walk = [FloorPoint.entrance]
-            for (offset, name) in walked.enumerated() {
+            let basket = walked.filter { bought[$0]?.contains(tripNumber) == true }
+            for (offset, name) in basket.enumerated() {
                 guard let entry = service.addToList(name, store: costco, by: shopper, now: start),
                       let checkOff = service.setChecked(entry, true, by: shopper,
                                                         now: start.addingTimeInterval(Double(offset) * 90))
@@ -168,7 +187,15 @@ enum DemoData {
             if let trip = service.currentTrip(at: costco, for: shopper, now: start) {
                 trip.path = FloorPlan.encode(walk)
             }
-            service.finishTrip(at: costco, for: shopper, now: start.addingTimeInterval(Double(walked.count) * 90))
+            service.finishTrip(at: costco, for: shopper, now: start.addingTimeInterval(Double(basket.count) * 90))
+        }
+        // Remembered from those trips but not on the list now: Restock says they're running low.
+        let restockZones = ["Bananas": "Produce", "Sparkling water": "Beverages, soda & Gatorade",
+                            "Dish soap": "Laundry, cleaning & pet", "Butter": "Dairy & center coolers"]
+        for (name, zone) in restockZones {
+            if let item = service.item(named: name, in: costco), let match = zones.first(where: { $0.displayName == zone }) {
+                service.setZone(match, for: item)
+            }
         }
         add("AA batteries", zone: "Electronics & optical")
         add("Paper towels", zone: "Paper goods & water")
