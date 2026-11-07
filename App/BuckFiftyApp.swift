@@ -21,8 +21,13 @@ struct BuckFiftyApp: App {
 struct RootView: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(SharingModel.self) private var sharing
+    @Environment(Profile.self) private var profile
     @FetchRequest(fetchRequest: Fetch.stores()) private var stores: FetchedResults<Store>
     @State private var path: [ListRoute] = []
+    /// The tour, on first launch.
+    @State private var showingTour = false
+    /// The guide (only opened from here by the screenshot demo; Help on the home screen opens it otherwise).
+    @State private var showingGuide = false
 
     /// Posted when another device's changes (or a newly accepted share) are merged in.
     private let remoteChanges = NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)
@@ -35,10 +40,20 @@ struct RootView: View {
         }
         .onAppear {
             sharing.refresh(Array(stores))
-            // The screenshot demo opens straight onto the Costco list, except for the stores screen itself.
-            guard Launch.isDemo, Launch.demoScreen != "stores", path.isEmpty, let costco = stores.first else { return }
+            if Launch.isDemo {
+                showingTour = Launch.demoScreen == "tour"
+                showingGuide = Launch.demoScreen == "guide"
+            } else if !profile.hasSeenTour {
+                showingTour = true
+            }
+            // The screenshot demo opens straight onto the Costco list, except for the home screen, the tour and the
+            // guide.
+            guard Launch.isDemo, !["stores", "tour", "guide"].contains(Launch.demoScreen), path.isEmpty,
+                  let costco = stores.first else { return }
             path = [ListRoute(store: costco, mode: Launch.demoScreen == "restock" ? .restock : .list)]
         }
+        .fullScreenCover(isPresented: $showingTour) { TourSheet() }
+        .sheet(isPresented: $showingGuide) { GuideSheet() }
         .onReceive(remoteChanges) { _ in sharing.refresh(Array(stores)) }
         .onChange(of: stores.count) { sharing.refresh(Array(stores)) }
         .alert("Sharing", isPresented: Binding(get: { sharing.errorMessage != nil },

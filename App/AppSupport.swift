@@ -6,7 +6,7 @@ import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
 /// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zone (the zone map),
-/// zones, map, everything or restock.
+/// zones, map, everything, restock, tour or guide.
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }
@@ -28,6 +28,10 @@ final class Profile {
     var mapsStore: Bool {
         didSet { defaults.set(mapsStore, forKey: "mapsStore") }
     }
+    /// Whether the tour has been seen (or skipped): it opens by itself until then.
+    var hasSeenTour: Bool {
+        didSet { defaults.set(hasSeenTour, forKey: "hasSeenTour") }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -40,6 +44,7 @@ final class Profile {
         }
         name = defaults.string(forKey: "shopperName") ?? ""
         mapsStore = defaults.bool(forKey: "mapsStore")
+        hasSeenTour = defaults.bool(forKey: "hasSeenTour")
     }
 
     var shopper: Shopper { Shopper(id: id, name: name.isEmpty ? "Me" : name) }

@@ -8,7 +8,7 @@ import ShoppingStore
 /// The home screen: a dashboard for the next trip. The LCD says which store is next and how much is on its list; a
 /// week strip shows the days you shopped and the day the next trip probably is; the tiles go shopping or restock;
 /// then what's running low at every store (one tap puts it on its list), each store with its rhythm, and the last
-/// month's trips in numbers.
+/// month's trips in numbers, and Help: the tour and the guide.
 struct StoresView: View {
     @Binding var path: [ListRoute]
     @Environment(\.managedObjectContext) private var context
@@ -20,6 +20,8 @@ struct StoresView: View {
     @FetchRequest(fetchRequest: Fetch.trips()) private var trips: FetchedResults<Trip>
     @State private var showingNewStore = false
     @State private var showingProfile = false
+    @State private var showingTour = false
+    @State private var showingGuide = false
 
     private var service: ListService { ListService(context: context) }
 
@@ -37,6 +39,10 @@ struct StoresView: View {
                 runningLow(glances, now: now)
                 storeList(glances, now: now)
                 lastMonth(now: now)
+                SKKeyGroup(caption: "Help") {
+                    SKCaptionedKey("Tour", systemImage: "play.rectangle") { showingTour = true }
+                    SKCaptionedKey("Guide", systemImage: "book") { showingGuide = true }
+                }
             }
             .padding(16)
         }
@@ -45,6 +51,8 @@ struct StoresView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingNewStore) { NewStoreSheet() }
         .sheet(isPresented: $showingProfile) { ProfileSheet() }
+        .sheet(isPresented: $showingGuide) { GuideSheet() }
+        .fullScreenCover(isPresented: $showingTour) { TourSheet() }
     }
 
     // MARK: What each store looks like right now

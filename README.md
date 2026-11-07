@@ -9,6 +9,10 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
 
 ## What's here
 
+- **The tour and the guide.** On first launch a tour walks through every part of the app, a page each with a
+  picture of it made from the real parts: it asks your name first and starts your first store at the end. **Help**
+  at the bottom of the home screen opens it again, or the guide: every part, how it works and every key, with
+  contents to jump around. Both come from `Guide.parts` (`App/Views/Guide.swift`).
 - **Home: the next trip at a glance.** The LCD names the store you're most likely to shop next (the one you or the
   other person is in, else the one with the most running low), how much is on its list, and when the next trip
   probably is. Under it a week strip on the glass shows the days you shopped and NEXT on the day the next trip is due.
@@ -141,7 +145,7 @@ does.
 With more than one iPhone connected, pick one with `DEVICE=<name> make install`. If a build fails, the errors are
 printed and the full log is at `build/dist.log`. `Scripts/dist.sh --help` lists the flags behind these.
 
-The demo store is in memory: `-demo` with `-demoScreen stores|list|restock|add|trip|edit|zones` opens one screen, which is
+The demo store is in memory: `-demo` with `-demoScreen stores|list|restock|add|trip|edit|zones|tour|guide` opens one screen, which is
 what the screenshots use.
 
 ## CI
