@@ -88,6 +88,7 @@ struct EditEntrySheet: View {
 struct ZonesSheet: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
+    @Environment(Profile.self) private var profile
     @Environment(\.dismiss) private var dismiss
     @FetchRequest private var zones: FetchedResults<Zone>
     @State private var newZone = ""
@@ -196,6 +197,7 @@ struct ZonesSheet: View {
         service.replaceZones(of: store, with: layout.zones)
         try? service.save()
         pendingLayout = nil
+        profile.markTried(Milestones.Try.layout)
         ZoneGuessing.guessMissing(in: store, context: context)
     }
 

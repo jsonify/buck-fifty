@@ -12,9 +12,15 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
 ## What's here
 
 - **The tour and the guide.** On first launch a tour walks through every part of the app, a page each with a
-  picture of it made from the real parts: it asks your name first and starts your first store at the end. **Help**
-  at the bottom of the home screen opens it again, or the guide: every part, how it works and every key, with
-  contents to jump around. Both come from `Guide.parts` (`App/Views/Guide.swift`).
+  picture of it made from the real parts: it asks your name first and starts your first store at the end.
+  **Settings** (with your name and Map the store) opens it again, or the guide: every part, how it works and every
+  key, with contents to jump around. Both come from `Guide.parts` (`App/Views/Guide.swift`).
+- **Milestones (#23).** Some of the app only switches on after a few trips, so Milestones shows, for each store, what
+  it has learned, what's next and how soon (the walk after one trip, the next-trip day after two, Look for it after
+  three, the floor plan after ten mapped trips…), and features to try (Restock, dragging an item, a zone layout,
+  sharing…). Home announces each once as it switches on, and shows what's coming as a **Checklist** (the next three,
+  with progress) or as **Levels** (New in town to Knows the store), chosen in Settings. The logic is
+  `ShoppingCore/Milestones.swift`; the targets are the features' own thresholds.
 - **Home: the next trip at a glance.** The LCD names the store you're most likely to shop next (the one you or the
   other person is in, else the one with the most running low), how much is on its list, and when the next trip
   probably is. Under it a week strip on the glass shows the days you shopped and NEXT on the day the next trip is due.

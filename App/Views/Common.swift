@@ -68,6 +68,7 @@ struct SpotField: View {
     @Binding var selection: WanderOverride?
     /// Whether the trips say it wanders.
     let tripsSayWanders: Bool
+    @Environment(Profile.self) private var profile
 
     var body: some View {
         CaptionedField(caption: "Spot", note: note) {
@@ -77,6 +78,9 @@ struct SpotField: View {
                 SKSegmented<WanderOverride?>.Option(.fixed, "Fixed spot", help: "Always in the walk"),
             ], height: 30)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onChange(of: selection) { _, spot in
+                if spot != nil { profile.markTried(Milestones.Try.spot) }
+            }
         }
     }
 

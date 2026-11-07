@@ -73,6 +73,8 @@ enum ZoneGuessing {
                                                      zones: service.zoneExamples(in: store))
                 if service.applyZoneGuess(answer, to: item) != nil {
                     do { try service.save() } catch { print("Buck Fifty: saving a zone guess failed: \(error)") }
+                    // Its milestone stays done once the guess is kept (and no longer marked guessed).
+                    AppModel.shared.profile.markTried(Milestones.Try.guess)
                 }
             }
             running.remove(key)

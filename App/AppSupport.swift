@@ -6,7 +6,8 @@ import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
 /// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zone (the zone map),
-/// zones, map, everything, restock, tour or guide.
+/// zones, map, everything, restock, tour, guide, settings, milestones, stores-checklist (home scrolled to Coming
+/// up), or stores-levels and milestones-levels (home and Milestones in the Levels style).
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }
@@ -14,6 +15,9 @@ enum Launch {
         guard let i = arguments.firstIndex(of: "-demoScreen"), arguments.indices.contains(i + 1) else { return "list" }
         return arguments[i + 1]
     }
+    /// The demo screens on or over the home screen, rather than the Costco list.
+    static let homeScreens: Set<String> = ["stores", "stores-checklist", "stores-levels", "tour", "guide", "settings",
+                                           "milestones", "milestones-levels"]
 }
 
 /// Who is using this phone. The id is made once and kept; the name is what the other person sees on a shared list.
@@ -33,6 +37,19 @@ final class Profile {
         didSet { defaults.set(hasSeenTour, forKey: "hasSeenTour") }
     }
 
+    /// How the home screen shows milestones (issue #23).
+    var milestoneStyle: MilestoneStyle {
+        didSet { defaults.set(milestoneStyle.rawValue, forKey: "milestoneStyle") }
+    }
+    /// The try-it milestones done on this phone (`Milestones.Try`).
+    private(set) var tried: Set<String> {
+        didSet { defaults.set(Array(tried).sorted(), forKey: "triedFeatures") }
+    }
+    /// The milestones already announced, as "store id/milestone id", so each is announced once.
+    private(set) var seenMilestones: Set<String> {
+        didSet { defaults.set(Array(seenMilestones).sorted(), forKey: "seenMilestones") }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let id = defaults.string(forKey: "shopperID") {
@@ -45,9 +62,45 @@ final class Profile {
         name = defaults.string(forKey: "shopperName") ?? ""
         mapsStore = defaults.bool(forKey: "mapsStore")
         hasSeenTour = defaults.bool(forKey: "hasSeenTour")
+        milestoneStyle = defaults.string(forKey: "milestoneStyle").flatMap(MilestoneStyle.init(rawValue:)) ?? .checklist
+        tried = Set(defaults.stringArray(forKey: "triedFeatures") ?? [])
+        seenMilestones = Set(defaults.stringArray(forKey: "seenMilestones") ?? [])
+    }
+
+    /// Marks a try-it milestone done (`Milestones.Try`): call it where the feature is used.
+    func markTried(_ id: String) {
+        if !tried.contains(id) { tried.insert(id) }
+    }
+
+    /// Whether `milestone` of `store` has been announced.
+    func hasSeen(_ milestone: Milestone, of store: Store) -> Bool {
+        seenMilestones.contains(Self.seenKey(milestone, store))
+    }
+
+    /// Marks milestones of `store` as announced.
+    func markSeen(_ milestones: [Milestone], of store: Store) {
+        let keys = milestones.map { Self.seenKey($0, store) }
+        if !Set(keys).isSubset(of: seenMilestones) { seenMilestones.formUnion(keys) }
+    }
+
+    /// Forgets which milestones were announced (the demo, so every screenshot run starts the same).
+    func forgetSeenMilestones() {
+        seenMilestones = []
+    }
+
+    private static func seenKey(_ milestone: Milestone, _ store: Store) -> String {
+        "\(store.id?.uuidString ?? "")/\(milestone.id)"
     }
 
     var shopper: Shopper { Shopper(id: id, name: name.isEmpty ? "Me" : name) }
+}
+
+/// How the home screen shows milestones: two takes on issue #23, to choose between in Settings.
+enum MilestoneStyle: String, CaseIterable {
+    /// A "Coming up" tray: the next few, each with how far along it is.
+    case checklist
+    /// A rank that rises as milestones are done, and how far to the next.
+    case levels
 }
 
 enum AppData {

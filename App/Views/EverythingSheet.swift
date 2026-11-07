@@ -19,6 +19,7 @@ struct EverythingSheet: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(Profile.self) private var profile
     @FetchRequest private var items: FetchedResults<Item>
     @FetchRequest private var zones: FetchedResults<Zone>
     @State private var editing: EditingItem?
@@ -52,7 +53,10 @@ struct EverythingSheet: View {
             Button("Done") { dismiss() }.buttonStyle(.sk1Key(.orange))
         }
         .sheet(item: $editing) { EditItemSheet(item: $0.item, zones: Array(zones)) }
-        .onAppear { ZoneGuessing.guessMissing(in: store, context: context) }
+        .onAppear {
+            ZoneGuessing.guessMissing(in: store, context: context)
+            profile.markTried(Milestones.Try.everything)
+        }
     }
 
     // MARK: Zone guesses
@@ -180,6 +184,7 @@ struct EverythingSheet: View {
         if let zone = target.storeZone, zone != item.storeZone { service.setZone(zone, for: item) }
         service.place(positions, moved: item)
         try? service.save()
+        profile.markTried(Milestones.Try.drag)
         return true
     }
 }

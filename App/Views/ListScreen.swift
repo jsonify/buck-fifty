@@ -110,6 +110,9 @@ struct ListScreen: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { endLapsedTrips() }
         }
+        .onChange(of: mode, initial: true) { _, mode in
+            if mode == .restock { profile.markTried(Milestones.Try.restock) }
+        }
     }
 
     // MARK: The LCD and keys
@@ -411,6 +414,7 @@ struct ListScreen: View {
         if let zone = target.item?.storeZone, zone != item.storeZone { service.setZone(zone, for: item) }
         service.place(positions, moved: item)
         save()
+        profile.markTried(Milestones.Try.drag)
         return true
     }
 

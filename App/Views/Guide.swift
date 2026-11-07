@@ -5,8 +5,8 @@ import SK1UI
 import ShoppingCore
 import ShoppingStore
 
-// The tour (on first launch, and from Help on the home screen) and the guide (Help): every part of the app, what it
-// does and every key. Both read `Guide.parts`, so when a feature changes, change its part here and both follow.
+// The tour (on first launch, and from Settings) and the guide (Settings, and a tap on a milestone): every part of the
+// app, what it does and every key. Both read `Guide.parts`, so when a feature changes, change its part here and both follow.
 
 /// One part of the app, as the tour and the guide explain it.
 struct GuidePart: Identifiable {
@@ -40,6 +40,10 @@ enum Guide {
                     + "low, and when the next trip is, or who's in the store.",
                 "The week strip shows three days back and three ahead. A dot marks the days anything was bought; NEXT "
                     + "marks the day the next trip probably is, from how often you go.",
+                "New at, under the keys, says when Buck Fifty has learned enough to switch something on. Got it "
+                    + "puts it away; each is said once.",
+                "Coming up, under it, shows what it learns next and features to try, or your level, as set in "
+                    + "Settings. See Milestones.",
                 "Running low lists what's due at every store. Add puts one on its store's list; Add all does them all.",
                 "Stores lists each store with what's on its list, what's running low and its next trip. A blinking "
                     + "teal lamp means someone is in that store now. Tap a store to open its list.",
@@ -51,10 +55,8 @@ enum Guide {
                 GuideKey(systemImage: "checklist", name: "Restock",
                          does: "Opens that store's restock checklist. Its lamp is lit when something's due."),
                 GuideKey(systemImage: "plus", name: "New store", does: "Adds a store, with zones to start from."),
-                GuideKey(systemImage: "person.crop.circle", name: "You",
-                         does: "Your name, as people you share with see it, and the Map the store setting."),
-                GuideKey(systemImage: "play.rectangle", name: "Tour", does: "This tour again."),
-                GuideKey(systemImage: "book", name: "Guide", does: "Every part of the app and every key, to look up."),
+                GuideKey(systemImage: "gearshape", name: "Settings",
+                         does: "Your name, how milestones show, all of them, the tour, the guide and Map the store."),
             ]),
         GuidePart(
             id: "list", title: "The list", systemImage: "list.bullet",
@@ -171,19 +173,44 @@ enum Guide {
                 "Rows say who added something or whose cart it's in; the LCD and the home screen say when the other "
                     + "person is in the store.",
                 "It goes through iCloud: no server, no cost. Changes made offline are sent when you're back online.",
-                "Your name, under You, is what they see.",
+                "Your name, in Settings, is what they see.",
             ]),
         GuidePart(
             id: "map", title: "Map the store", systemImage: "map",
             summary: "Experimental, and off until you turn it on: your steps and the compass trace your walk, and every "
                 + "check-off becomes a point on a floor plan.",
             points: [
-                "Turn on Map the store under You, then tap Start trip at the door and keep the app open while you shop.",
+                "Turn on Map the store in Settings, then tap Start trip at the door and keep the app open while you "
+                    + "shop.",
                 "Steel shelves bend the compass, so headings snap to the aisles, items that have settled correct where "
                     + "you are, and the walk's end is pinned to the checkout.",
                 "The map key on the list shows items coloured by zone, with your last walk over them. After about ten "
                     + "trips it's worth a look.",
                 "It asks for Motion & Fitness access. The walk stays on your phone and in your shared list.",
+            ]),
+        GuidePart(
+            id: "milestones", title: "Milestones", systemImage: "flag.2.crossed",
+            summary: "Buck Fifty gets smarter as you shop, so some of it only switches on after a few trips. "
+                + "Milestones shows what it has learned, what's next and how soon, and features to try.",
+            points: [
+                "Learning, for each store: the walk after one trip, the next-trip day after two days shopped, what's "
+                    + "running low once something's been bought twice, staples after three days, Look for it after "
+                    + "three trips, guessed zones, and the floor plan after ten mapped trips.",
+                "Each says how far along it is (2/3) and what it's waiting for. They count the store's trips, so "
+                    + "they're the same on every phone it's shared with.",
+                "Try it: features that are there already, like Restock, dragging an item into place, Everything, an "
+                    + "item's spot, a zone layout, sharing and Map the store. Each is ticked the first time you use "
+                    + "it on this phone.",
+                "Tap a milestone for how it works, here in the guide.",
+                "In Settings, choose how home shows them: Checklist, the next three with how far along each is; or "
+                    + "Levels, a level from New in town to Knows the store that goes up as they're done.",
+                "When one switches on, home says so once under its keys, in New at.",
+            ],
+            keys: [
+                GuideKey(systemImage: "flag.2.crossed", name: "All milestones",
+                         does: "Every milestone for a store, on home under Coming up and in Settings."),
+                GuideKey(systemImage: "checkmark", name: "Got it",
+                         does: "Puts away what just switched on, under the keys on home."),
             ]),
     ]
 }
@@ -191,7 +218,7 @@ enum Guide {
 // MARK: The tour
 
 /// The tour: a welcome that asks your name, a page for each part of the app, then a last page that starts your first
-/// store. Shown once on first launch, and again from Help on the home screen.
+/// store. Shown once on first launch, and again from Settings.
 struct TourSheet: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -245,8 +272,8 @@ struct TourSheet: View {
                      + "you go. Shared with someone, it changes on both phones as you shop.")
                     .sk1Ink()
                     .fixedSize(horizontal: false, vertical: true)
-                Text("This tour has a page for every part of the app. Swipe, or use Next. It's always under Help on "
-                     + "the home screen, with the guide.")
+                Text("This tour has a page for every part of the app. Swipe, or use Next. It's always in Settings, "
+                     + "with the guide.")
                     .sk1Hint()
                     .fixedSize(horizontal: false, vertical: true)
                 CaptionedField(caption: "Your name",
@@ -401,6 +428,16 @@ private struct TourPicture: View {
             }
         case "sharing":
             SKDisplay(title: "At home", detail: "SAM IN STORE", message: "Ready", number: 9, digits: 3, unit: "LEFT")
+        case "milestones":
+            VStack(spacing: 10) {
+                LevelMeter(level: Milestones.level(done: 6, of: 14), total: 14)
+                SKGroup(caption: "Coming up · 6 of 14") {
+                    if let next = Milestones.all(MilestoneFacts(teachingTrips: 2, tripDays: 2))
+                        .first(where: { $0.id == "lookForIt" }) {
+                        MilestoneRow(milestone: next)
+                    }
+                }
+            }
         default:
             EmptyView()
         }
@@ -475,6 +512,8 @@ private struct GuidePoints: View {
 
 /// The guide: every part of the app, to look things up. Contents at the top jump to a part.
 struct GuideSheet: View {
+    /// The part to open at (a `GuidePart.id`), or nil for the top.
+    var startAt: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -513,6 +552,11 @@ struct GuideSheet: View {
                         }
                     }
                     .padding(SK1.Metrics.paneMargin)
+                }
+                .onAppear {
+                    guard let startAt else { return }
+                    // After the first layout, so the part has a place to scroll to.
+                    DispatchQueue.main.async { proxy.scrollTo(startAt, anchor: .top) }
                 }
             }
             SKGroove()
