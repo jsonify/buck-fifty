@@ -138,6 +138,16 @@ struct ZoneMap: View {
         block.zone.map { available.contains(ItemName.normalized($0)) } ?? false
     }
 
+    /// The type size at which `label`'s longest word fits a block `width` wide (semibold runs about 0.62 em a
+    /// character), up to 9 pt. Nil below 6 pt or when one line doesn't fit the height: the label is left off rather
+    /// than broken in the middle of a word.
+    static func labelSize(_ label: String, width: Double, height: Double) -> Double? {
+        guard let longest = label.split(separator: " ").map(\.count).max(), longest > 0 else { return nil }
+        let size = min(9, (width - 4) / (Double(longest) * 0.62))
+        guard size >= 6, height - 4 >= size * 1.2 else { return nil }
+        return size
+    }
+
     private func isSelected(_ block: PlanBlock) -> Bool {
         guard let zone = block.zone, let selected else { return false }
         return ItemName.normalized(zone) == ItemName.normalized(selected)
@@ -163,9 +173,9 @@ struct ZoneMap: View {
                     } else {
                         context.fill(shape, with: .color(soft.opacity(0.18)))
                     }
-                    if r.width >= 22 && r.height >= 12 {
+                    if let size = Self.labelSize(block.label, width: r.width, height: r.height) {
                         let label = Text(block.label)
-                            .font(.system(size: r.width < 50 ? 8 : 9, weight: .semibold))
+                            .font(.system(size: size, weight: .semibold))
                             .foregroundStyle(chosen ? Color.white : (isAvailable(block) ? ink : soft))
                         context.draw(label, in: rect.insetBy(dx: 2, dy: 2))
                     }
@@ -183,7 +193,7 @@ struct ZoneMap: View {
         }
         .aspectRatio(plan.aspect, contentMode: .fit)
         // The whole store on one screen, rather than larger blocks that need scrolling.
-        .frame(maxWidth: .infinity, maxHeight: 600)
+        .frame(maxWidth: .infinity, maxHeight: 580)
         .accessibilityHidden(true)
     }
 }
