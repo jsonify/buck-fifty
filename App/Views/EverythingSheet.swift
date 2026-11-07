@@ -119,7 +119,8 @@ struct EverythingSheet: View {
     private var arrangement: (rows: [Row], zoneNames: [String], zonePositions: [Int: Double]) {
         let zoneList = Array(zones)
         let rows = items.map { Row(item: $0, zoneIndex: $0.storeZone.flatMap { zoneList.firstIndex(of: $0) }) }
-        let zonePositions = ListOrdering.zoneAverages(rows.map { (zone: $0.zoneIndex, position: $0.learnedPosition) })
+        let zonePositions = ListOrdering.zoneAverages(rows.filter { !$0.item.wanders }
+            .map { (zone: $0.zoneIndex, position: $0.learnedPosition) })
         return (rows, zoneList.map(\.displayName), zonePositions)
     }
 
@@ -158,6 +159,7 @@ struct EverythingSheet: View {
 
     /// Its zone and where in the walk it's grabbed.
     private func detail(_ item: Item) -> String {
+        if item.wanders { return "\(zoneName(item)) · moves around" }
         guard let position = item.learnedPosition?.doubleValue else { return "\(zoneName(item)) · not bought yet" }
         return "\(zoneName(item)) · \(Int((position * 100).rounded()))% of the way round"
     }
@@ -216,6 +218,7 @@ struct EditItemSheet: View {
     @State private var zone: Zone?
     @State private var nameTaken = false
     @State private var confirmingForget = false
+    @State private var spot: WanderOverride?
 
     private var service: ListService { ListService(context: context) }
 
@@ -228,6 +231,7 @@ struct EditItemSheet: View {
             CaptionedField(caption: item.isZoneGuessed ? "Zone · guessed" : "Zone", note: zoneNote) {
                 ZoneField(selection: $zone, zones: zones)
             }
+            SpotField(selection: $spot, tripsSayWanders: item.isWandering)
             Text(positionNote).sk1Hint().fixedSize(horizontal: false, vertical: true)
         } actions: {
             Button("Forget") { confirmingForget = true }.buttonStyle(.sk1Key(.charcoal))
@@ -245,6 +249,7 @@ struct EditItemSheet: View {
         .onAppear {
             name = item.displayName
             zone = item.storeZone
+            spot = item.wanderChoice
         }
     }
 
@@ -255,6 +260,7 @@ struct EditItemSheet: View {
 
     private var positionNote: String {
         let trips = item.positionSampleCount
+        if item.wanders, let seen = service.wanderNote(for: item) { return "\(seen)." }
         guard let position = item.learnedPosition?.doubleValue else {
             return "Not bought on a trip yet: once it's checked off in the store, it learns where it goes."
         }
@@ -275,6 +281,7 @@ struct EditItemSheet: View {
         } else {
             service.confirmZone(of: item)
         }
+        service.setWanderOverride(spot, for: item)
         return true
     }
 

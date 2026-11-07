@@ -173,18 +173,24 @@ enum DemoData {
             "Coffee beans": FloorPoint(x: 12, y: 56), "Croissants": FloorPoint(x: 6, y: 48),
             "Rotisserie chicken": FloorPoint(x: 6, y: 26),
         ]
+        // Where in each trip (by its number) the advent calendar was found.
+        let adventPlaces: [Int: Double] = [2: 0.15, 3: 0.8, 4: 0.4, 5: 0.65]
         costco.gridHeading = 0
         for (tripNumber, weeksAgo) in [6.0, 5, 4, 3, 2, 1].enumerated() {
             let start = Date().addingTimeInterval(-weeksAgo * 7 * 24 * 60 * 60)
             var walk = [FloorPoint.entrance]
-            let basket = walked.filter { bought[$0]?.contains(tripNumber) == true }
+            var basket = walked.filter { bought[$0]?.contains(tripNumber) == true }
+            // The advent calendar turns up somewhere new every trip (issue #8): it's under Look for it.
+            if let place = adventPlaces[tripNumber] {
+                basket.insert("Advent calendar", at: min(Int(place * Double(basket.count)), basket.count))
+            }
             for (offset, name) in basket.enumerated() {
                 guard let entry = service.addToList(name, store: costco, by: shopper, now: start),
                       let checkOff = service.setChecked(entry, true, by: shopper,
                                                         now: start.addingTimeInterval(Double(offset) * 90))
                 else { continue }
                 let wobble = Double(offset * 7 + tripNumber * 13)
-                let point = (spots[name] ?? .entrance) + FloorPoint(x: 2 * sin(wobble), y: 2 * cos(wobble * 1.3))
+                let point = (spots[name] ?? walk.last ?? .entrance) + FloorPoint(x: 2 * sin(wobble), y: 2 * cos(wobble * 1.3))
                 service.setPoint(point, of: checkOff)
                 walk.append(point)
             }
@@ -216,6 +222,7 @@ enum DemoData {
         add("Croissants", zone: "Bakery", note: "If they're fresh")
         add("Rotisserie chicken", zone: "Rotisserie & deli")
         add("Kirkland pesto", zone: nil, by: partner)
+        add("Advent calendar", zone: "Home & auto", by: partner)
         // What the on-device model would guess for an item it has never seen (issue #4).
         if let pesto = costco.entries.first(where: { $0.displayName == "Kirkland pesto" })?.item {
             service.applyZoneGuess("Dairy & center coolers", to: pesto)

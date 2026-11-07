@@ -71,6 +71,16 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   goes by its zone's average, then its zone's place in the walking order, and items with no zone go last. Each item
   keeps its last 10 samples, and a time-based position too, to compare with the rank one on real trips. The logic is
   `RouteLearning` in `ShoppingCore`; `ListService.learn(from:)` applies it when a trip ends.
+- **Look for it: things that move around.** Seasonal and treasure-hunt things never settle in one place, so they
+  don't get to scramble the sort. Once three or more trips have placed an item, and its last five positions are
+  spread out (standard deviation over 0.2, a fifth of the store) with fewer than half of them in one place (within
+  0.15), it **wanders**: it leaves the walk and goes to **Look for it** at the top of the list, with where it's been
+  seen ("Seen anywhere from 20% to 75% of the way in, last at 40%") and its zone. It still learns from every trip,
+  and goes back into the walk once its last three trips agree (within 0.15). The half rule keeps an item that simply
+  moved, or one odd trip, out of it. **Spot** in an item's editor overrides it: Moves around, Fixed spot, or
+  Learn it (the trips decide). The flag and the override are on the item, so they're shared. Wandering items are
+  left out of their zone's average. The logic is `Wandering` in `ShoppingCore`; `ListService.learn(from:)` applies
+  it, and the thresholds want tuning on real trips.
 
 - **Map the store (experimental, off by default).** Turn on **Map the store** under your name, then tap
   **Start trip** at the door. Your steps (`CMPedometer`) and the compass (device motion against magnetic north)

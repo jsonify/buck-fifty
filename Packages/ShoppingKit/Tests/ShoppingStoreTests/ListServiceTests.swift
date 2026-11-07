@@ -10,6 +10,7 @@ struct Row: ListSortable {
     var zoneIndex: Int?
     var isChecked: Bool
     var learnedPosition: Double?
+    var isWandering = false
     var sortName: String { name }
 }
 
@@ -157,7 +158,8 @@ final class ListServiceTests: XCTestCase {
         let averages = service.zonePositions(in: store)
         let rows = store.entries.map { entry in
             Row(name: entry.displayName, zoneIndex: entry.item?.storeZone.flatMap { zones.firstIndex(of: $0) },
-                isChecked: entry.isChecked, learnedPosition: entry.item?.learnedPosition?.doubleValue)
+                isChecked: entry.isChecked, learnedPosition: entry.item?.learnedPosition?.doubleValue,
+                isWandering: entry.item?.wanders == true)
         }
         var byIndex: [Int: Double] = [:]
         for (index, zone) in zones.enumerated() { byIndex[index] = averages[zone] }

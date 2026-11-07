@@ -10,15 +10,20 @@ public protocol ListSortable {
     var isChecked: Bool { get }
     /// Where in a trip the item is grabbed, 0 (entrance) to 1 (checkout), learned from check-offs; nil until then.
     var learnedPosition: Double? { get }
+    /// Whether the item never settles in one place (issue #8): it goes at the top, under Look for it.
+    var isWandering: Bool { get }
 }
 
 extension ListSortable {
     public var learnedPosition: Double? { nil }
+    public var isWandering: Bool { false }
 }
 
 /// One heading of the list and its entries.
 public struct ListSection<Entry> {
     public enum Kind: Hashable, Sendable {
+        /// Unchecked entries whose item wanders: at the top, to look out for.
+        case lookForIt
         /// The entries in the zone at this index of the store's zones.
         case zone(Int)
         /// Entries whose item has no zone.
@@ -42,11 +47,13 @@ public struct ListSection<Entry> {
     public var id: Key { Key(kind: kind, occurrence: occurrence) }
 }
 
-/// The order the list is shown in. Unchecked entries come in the order the store is walked: by learned position,
+/// The order the list is shown in. Unchecked items that wander come first (alphabetically: they could be anywhere).
+/// The other unchecked entries come in the order the store is walked: by learned position,
 /// then (for items not learned yet) their zone's average learned position, then their zone's place in the walking
 /// order, then the entries without a zone at the end. Everything checked off comes last. Before anything is learned
 /// that is simply the zones in walking order, alphabetical within a zone.
 public enum ListOrdering {
+    public static let lookForItTitle = "Look for it"
     public static let unzonedTitle = "No zone yet"
     public static let inCartTitle = "In the cart"
 
@@ -69,8 +76,11 @@ public enum ListOrdering {
         return entries.map { (entry: $0, key: walkPosition(of: $0, zoneCount: zones, zonePositions: zonePositions)) }
             .sorted { a, b in
                 if a.entry.isChecked != b.entry.isChecked { return !a.entry.isChecked }
+                let wa = !a.entry.isChecked && a.entry.isWandering, wb = !b.entry.isChecked && b.entry.isWandering
+                if wa != wb { return wa }
                 // Checked entries keep a stable alphabetical order; where they are in the store no longer matters.
-                if !a.entry.isChecked {
+                // So do wandering ones: they could be anywhere.
+                if !a.entry.isChecked && !wa {
                     switch (a.key, b.key) {
                     case let (ka?, kb?) where ka != kb: return ka < kb
                     case (.some, .none): return true
@@ -87,8 +97,8 @@ public enum ListOrdering {
             .map { $0.entry }
     }
 
-    /// `entries` in list order under headings: a section for each run of entries in the same zone (titled from
-    /// `zoneNames`), runs without a zone, then the checked-off ones. Before anything is learned that is one section
+    /// `entries` in list order under headings: Look for it (the unchecked ones that wander), a section for each run
+    /// of entries in the same zone (titled from `zoneNames`), runs without a zone, then the checked-off ones. Before anything is learned that is one section
     /// per zone in walking order. Empty sections are left out. A zone index outside `zoneNames` counts as no zone.
     ///
     /// With `oneSectionPerZone` (the list at home, when it's read rather than walked), a zone that comes round again
@@ -102,6 +112,8 @@ public enum ListOrdering {
             let kind: ListSection<E>.Kind
             if entry.isChecked {
                 kind = .inCart
+            } else if entry.isWandering {
+                kind = .lookForIt
             } else if let z = entry.zoneIndex, zoneNames.indices.contains(z) {
                 kind = .zone(z)
             } else {
@@ -114,6 +126,7 @@ public enum ListOrdering {
             } else {
                 let title: String
                 switch kind {
+                case .lookForIt: title = lookForItTitle
                 case .zone(let z): title = zoneNames[z]
                 case .unzoned: title = unzonedTitle
                 case .inCart: title = inCartTitle
@@ -166,7 +179,8 @@ public enum ListOrdering {
         return spread(first...last, above: below, below: above)
     }
 
-    /// The walk positions of `entries`, as `sorted` uses them (see `positionsAfterMove`).
+    /// The walk positions of `entries`, as `sorted` uses them (see `positionsAfterMove`). Leave out wandering
+    /// entries: they're not in the walk, so their positions would be out of order.
     public static func walkPositions<E: ListSortable>(_ entries: [E], zoneCount: Int,
                                                       zonePositions: [Int: Double]) -> [Double?] {
         entries.map { walkPosition(of: $0, zoneCount: zoneCount, zonePositions: zonePositions) }
