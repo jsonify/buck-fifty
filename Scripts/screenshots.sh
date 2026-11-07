@@ -24,6 +24,11 @@ if ! xcodebuild build -project BuckFifty.xcodeproj -scheme BuckFifty -destinatio
   exit 1
 fi
 app=build/Screenshots/Build/Products/Debug-iphonesimulator/BuckFifty.app
+# The app icon compiled from the asset catalog (the home screen shows a blank one otherwise).
+if ! ls "$app"/AppIcon*.png >/dev/null 2>&1; then
+  echo "The app has no icon: check App/Assets.xcassets/AppIcon.appiconset." >&2
+  exit 1
+fi
 xcrun simctl bootstatus "$udid" -b >/dev/null
 xcrun simctl install "$udid" "$app"
 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 \
