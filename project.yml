@@ -42,6 +42,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Buck Fifty
+        # Only standard encryption (HTTPS, iCloud), so TestFlight doesn't ask about export compliance on each build.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
