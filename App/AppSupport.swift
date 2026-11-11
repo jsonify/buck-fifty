@@ -5,9 +5,9 @@ import ShoppingCore
 import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
-/// previews); `-demoScreen <name>` opens one screen: stores, list (default), add, trip, edit, zone (the zone map),
-/// zones, map, everything, restock, tour, guide, settings, milestones, stores-checklist (home scrolled to Coming
-/// up), or stores-levels and milestones-levels (home and Milestones in the Levels style).
+/// previews); `-demoScreen <name>` opens one screen: home (with home-checklist and home-levels scrolled to Coming
+/// up), list (default), add, trip, edit, zone (the zone map), zones, floorplan, everything, map (the Map tab, during
+/// a trip), restock, you, stores (the store chooser), tour, guide, milestones, or milestones-levels.
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }
@@ -15,9 +15,16 @@ enum Launch {
         guard let i = arguments.firstIndex(of: "-demoScreen"), arguments.indices.contains(i + 1) else { return "list" }
         return arguments[i + 1]
     }
-    /// The demo screens on or over the home screen, rather than the Costco list.
-    static let homeScreens: Set<String> = ["stores", "stores-checklist", "stores-levels", "tour", "guide", "settings",
-                                           "milestones", "milestones-levels"]
+    /// The tab a demo screen is on or over.
+    static var demoTab: AppTab {
+        switch demoScreen {
+        case "home", "home-checklist", "home-levels", "stores", "tour", "guide": return .home
+        case "map": return .map
+        case "restock": return .restock
+        case "you", "milestones", "milestones-levels": return .you
+        default: return .list
+        }
+    }
 }
 
 /// Who is using this phone. The id is made once and kept; the name is what the other person sees on a shared list.
@@ -95,7 +102,7 @@ final class Profile {
     var shopper: Shopper { Shopper(id: id, name: name.isEmpty ? "Me" : name) }
 }
 
-/// How the home screen shows milestones: two takes on issue #23, to choose between in Settings.
+/// How the home screen shows milestones: two takes on issue #23, to choose between on the You tab.
 enum MilestoneStyle: String, CaseIterable {
     /// A "Coming up" tray: the next few, each with how far along it is.
     case checklist
@@ -288,7 +295,7 @@ enum DemoData {
         let tjs = service.createStore(named: "Trader Joe's")
         for name in ["Bananas", "Dark chocolate"] { service.addToList(name, store: tjs, by: shopper) }
 
-        if screen == "trip" {
+        if screen == "trip" || screen == "map" {
             // You and your partner shopping the same list at once: two trips.
             let start = Date().addingTimeInterval(-14 * 60)
             for (offset, name) in ["AA batteries", "Paper towels", "Olive oil"].enumerated() {

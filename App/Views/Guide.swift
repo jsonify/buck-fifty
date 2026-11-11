@@ -5,7 +5,7 @@ import SK1UI
 import ShoppingCore
 import ShoppingStore
 
-// The tour (on first launch, and from Settings) and the guide (Settings, and a tap on a milestone): every part of the
+// The tour (on first launch, and from the You tab) and the guide (the You tab, and a tap on a milestone): every part of the
 // app, what it does and every key. Both read `Guide.parts`, so when a feature changes, change its part here and both follow.
 
 /// One part of the app, as the tour and the guide explain it.
@@ -32,48 +32,53 @@ enum Guide {
     static let parts: [GuidePart] = [
         GuidePart(
             id: "home", title: "Home", systemImage: "house",
-            summary: "The home screen is about your next trip: which store, how much is on its list, what's running "
-                + "low, and when you'll probably go.",
+            summary: "Five tabs along the bottom: Home, List, Map, Restock and You. Each is about one store, named at "
+                + "the top; tap its name to switch stores. Home is your next trip at a glance.",
             points: [
-                "The LCD names the store you'll most likely shop next: the one you or the other person is in, else the "
-                    + "one with the most running low. It shows how many things are on its list, how many are running "
-                    + "low, and when the next trip is, or who's in the store.",
-                "The week strip shows three days back and three ahead. A dot marks the days anything was bought; NEXT "
-                    + "marks the day the next trip probably is, from how often you go.",
-                "New at, under the keys, says when Buck Fifty has learned enough to switch something on. Got it "
-                    + "puts it away; each is said once.",
-                "Coming up, under it, shows what it learns next and features to try, or your level, as set in "
-                    + "Settings. See Milestones.",
-                "Running low lists what's due at every store. Add puts one on its store's list; Add all does them all.",
-                "Stores lists each store with what's on its list, what's running low and its next trip. A blinking "
-                    + "teal lamp means someone is in that store now. Tap a store to open its list.",
-                "Last 30 days counts the trips, the things bought, the average trip and the last one.",
+                "The store is the one you choose, else the one you're on a trip in, else the first. Tap the store's "
+                    + "name at the top of any tab to choose another or add one. A teal lamp means someone is in that "
+                    + "store now.",
+                "Type in the field at the top to add something to the list, as on the List tab.",
+                "The LCD says when the next trip probably is and how many things are on the list. The strip under it "
+                    + "is this week: a filled cell for each day you shopped, NEXT on the day you'll probably go.",
+                "Your list shows the first few things in store order, with the stop each is at. All opens the List "
+                    + "tab.",
+                "Due before the next trip: a card for each thing you'll run out of. Add puts it on the list; Add all "
+                    + "does them all.",
+                "New at says when Buck Fifty has learned enough to switch something on. Coming up shows what it "
+                    + "learns next, or your level, as set on the You tab. See Milestones.",
+                "Last 30 days counts this store's trips, the things bought, the average trip and the last one.",
             ],
             keys: [
-                GuideKey(systemImage: "cart", name: "Shop",
-                         does: "Opens the next store's list. Says Resume while you're on a trip."),
-                GuideKey(systemImage: "checklist", name: "Restock",
-                         does: "Opens that store's restock checklist. Its lamp is lit when something's due."),
-                GuideKey(systemImage: "plus", name: "New store", does: "Adds a store, with zones to start from."),
-                GuideKey(systemImage: "gearshape", name: "Settings",
-                         does: "Your name, how milestones show, all of them, the tour, the guide and Map the store."),
+                GuideKey(systemImage: "cart", name: "Start trip",
+                         does: "Starts a trip at the door and opens the list. Says Back to the trip while you're on one."),
+                GuideKey(systemImage: "person.badge.plus", name: "Share",
+                         does: "Invites someone to this store's list. It stays lit once the list is shared."),
+                GuideKey(systemImage: "person.crop.circle", name: "You",
+                         does: "The last tab: your name, how milestones show, the tour, the guide and Map the store."),
             ]),
         GuidePart(
             id: "list", title: "The list", systemImage: "list.bullet",
-            summary: "Each store has its own list, in the order you walk the store, under its zones.",
+            summary: "Each store has its own list, in the order you walk the store: a stop for each zone, on a rail "
+                + "from the door to the checkout.",
             points: [
                 "Type in the field to add something. Things the store remembers come up as you type, with their zone: "
                     + "tap one to add it. Adding something that's already on the list adds one more (×2).",
                 "Tap a row to check it off. Hold a row to edit its name, zone, spot, how many and a note, or to "
                     + "remove it.",
-                "Look for it, at the top, holds things that move around the store, with where they've been seen.",
+                "Every row in the walk has a number: the order you'll pick it up. The numbers stay put as you check "
+                    + "things off, so 7 is still 7 at the end of the trip. The next one is orange; done stops turn "
+                    + "blue on the rail.",
+                "Look for it, at the top, holds things that move around the store, with where they've been seen. "
+                    + "They have no number.",
                 "Hold an item and drag it onto another: it takes that one's place in the walk, and its zone. The "
                     + "list remembers where you put it.",
-                "At home each zone has one heading. In the store the list follows your walk, so a zone can come round "
+                "At home each zone is one stop. In the store the list follows your walk, so a zone can come round "
                     + "twice.",
+                "At home the list starts with a strip of what's running low, one tap each.",
                 "On a shared list, rows say who added them, or whose cart they're in.",
-                "The LCD says At home or In the store, a short status (Ready, 4 due, 3 in cart, All in) and how many "
-                    + "things are left.",
+                "The LCD says At home or In the store and how many things are left. In the store it names the next "
+                    + "thing to get, and its strip has a cell per stop: full once done, half for the next one.",
             ],
             keys: [
                 GuideKey(systemImage: "square.stack.3d.up", name: "Zones",
@@ -88,19 +93,39 @@ enum Guide {
                          does: "Starts a trip at the door; Done ends it and takes what you bought off the list."),
             ]),
         GuidePart(
-            id: "restock", title: "Restock", systemImage: "checklist",
-            summary: "Restock is the checklist for your next trip: everything the store remembers, with what you'll run "
-                + "out of first.",
+            id: "storemap", title: "The Map tab", systemImage: "map.fill",
+            summary: "The same trip as the list, drawn on the store: each zone where it is, with the walk numbers "
+                + "pinned where you'll pick things up.",
             points: [
-                "Switch between On the list and Restock under the list's keys. Each says how many.",
+                "Zones come from the store's floor plan when it has one (the Aurora Village layout does), else they're "
+                    + "laid out in walking order from the door.",
+                "Blue zones are done, the orange one is next, the rest are still ahead. The dashed blue line is the "
+                    + "walk so far, from the door; the orange dot is about where you are.",
+                "The pins are the same numbers as the list. Under the map, the next few stops and what's at them: tap "
+                    + "one to check it off.",
+                "It works without Map the store. With it on, the floor plan key shows where things really are, from "
+                    + "your mapped trips.",
+            ],
+            keys: [
+                GuideKey(systemImage: "list.bullet", name: "List", does: "Opens the List tab."),
+                GuideKey(systemImage: "map", name: "Floor plan",
+                         does: "Where things are, from mapped trips. Only there with Map the store on."),
+                GuideKey(systemImage: "flag.checkered", name: "Start trip / Done",
+                         does: "The same trip key as on the list."),
+            ]),
+        GuidePart(
+            id: "restock", title: "Restock", systemImage: "checklist",
+            summary: "Restock, its own tab, is the checklist for your next trip: everything the store remembers, with "
+                + "what you'll run out of first.",
+            points: [
+                "The LCD says when the next trip is and how many things are due. The tab's badge says it too.",
                 "Every check-off is a purchase with a date, so each item has a rhythm: the usual days between buying "
                     + "it. The store has one too, which says when the next trip is.",
                 "Before the next trip: what will run out before then (DUE), or should have already (LATE). Running "
                     + "low soon: due the trip after next. Staples: bought on half the trips or more. Now and then: the "
                     + "rest.",
                 "Tap a row to tick it onto the list, and again to take it off. Add N due puts everything due on the "
-                    + "list.",
-                "At home the list itself starts with a strip of keys for what's running low, one tap each.",
+                    + "list. When nothing's left to add, the key opens the list.",
                 "It needs two purchases of something to know its rhythm. Purchases count by day, so two people "
                     + "splitting up in the store count once.",
             ]),
@@ -173,18 +198,18 @@ enum Guide {
                 "Rows say who added something or whose cart it's in; the LCD and the home screen say when the other "
                     + "person is in the store.",
                 "It goes through iCloud: no server, no cost. Changes made offline are sent when you're back online.",
-                "Your name, in Settings, is what they see.",
+                "Your name, on the You tab, is what they see.",
             ]),
         GuidePart(
             id: "map", title: "Map the store", systemImage: "map",
             summary: "Experimental, and off until you turn it on: your steps and the compass trace your walk, and every "
                 + "check-off becomes a point on a floor plan.",
             points: [
-                "Turn on Map the store in Settings, then tap Start trip at the door and keep the app open while you "
+                "Turn on Map the store on the You tab, then tap Start trip at the door and keep the app open while you "
                     + "shop.",
                 "Steel shelves bend the compass, so headings snap to the aisles, items that have settled correct where "
                     + "you are, and the walk's end is pinned to the checkout.",
-                "The map key on the list shows items coloured by zone, with your last walk over them. After about ten "
+                "The floor plan key on the list shows items coloured by zone, with your last walk over them. After about ten "
                     + "trips it's worth a look.",
                 "It asks for Motion & Fitness access. The walk stays on your phone and in your shared list.",
             ]),
@@ -202,15 +227,15 @@ enum Guide {
                     + "item's spot, a zone layout, sharing and Map the store. Each is ticked the first time you use "
                     + "it on this phone.",
                 "Tap a milestone for how it works, here in the guide.",
-                "In Settings, choose how home shows them: Checklist, the next three with how far along each is; or "
+                "On the You tab, choose how home shows them: Checklist, the next three with how far along each is; or "
                     + "Levels, a level from New in town to Knows the store that goes up as they're done.",
-                "When one switches on, home says so once under its keys, in New at.",
+                "When one switches on, home says so once, in New at.",
             ],
             keys: [
                 GuideKey(systemImage: "flag.2.crossed", name: "All milestones",
-                         does: "Every milestone for a store, on home under Coming up and in Settings."),
+                         does: "Every milestone for a store, on home under Coming up and on the You tab."),
                 GuideKey(systemImage: "checkmark", name: "Got it",
-                         does: "Puts away what just switched on, under the keys on home."),
+                         does: "Puts away what just switched on, on home."),
             ]),
     ]
 }
@@ -218,7 +243,7 @@ enum Guide {
 // MARK: The tour
 
 /// The tour: a welcome that asks your name, a page for each part of the app, then a last page that starts your first
-/// store. Shown once on first launch, and again from Settings.
+/// store. Shown once on first launch, and again from the You tab.
 struct TourSheet: View {
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -272,7 +297,7 @@ struct TourSheet: View {
                      + "you go. Shared with someone, it changes on both phones as you shop.")
                     .sk1Ink()
                     .fixedSize(horizontal: false, vertical: true)
-                Text("This tour has a page for every part of the app. Swipe, or use Next. It's always in Settings, "
+                Text("This tour has a page for every part of the app. Swipe, or use Next. It's always on the You tab, "
                      + "with the guide.")
                     .sk1Hint()
                     .fixedSize(horizontal: false, vertical: true)
@@ -381,23 +406,49 @@ private struct TourPicture: View {
         switch id {
         case "home":
             VStack(spacing: 10) {
-                SKDisplay(title: "Costco", detail: "NEXT TRIP TOMORROW", message: "4 low", number: 14, digits: 3,
-                          unit: "TO GET")
-                WeekStrip(shopped: [day(-3)], nextTrip: day(1), now: Date())
+                TripLCD(label: "Next trip tomorrow", main: "Costco · on the list", number: 14, unit: "items",
+                        strip: weekStrip, legend: ["Last 3 days ago", "Every 4 days"])
+                ListCard {
+                    ItemRow(name: "Bananas", detail: "Produce", isChecked: false, number: 1, isNext: true, toggle: {})
+                    ItemRow(name: "Eggs", detail: "Dairy & center coolers", quantity: 2, isChecked: false, number: 2,
+                            showsDivider: true, toggle: {})
+                }
             }
         case "list":
-            SKGroup(caption: "Dairy & center coolers") {
-                SampleRow(title: "Eggs", subtitle: nil, checked: false, chip: "×2")
-                SampleRow(title: "Greek yogurt", subtitle: "Added by Sam", checked: false, chip: nil)
-                SampleRow(title: "Kirkland pesto", subtitle: nil, checked: false, chip: "GUESSED")
+            VStack(alignment: .leading, spacing: 6) {
+                ZoneHeader(title: "Dairy & center coolers", count: "2 of 3", state: .next)
+                ListCard {
+                    ItemRow(name: "Eggs", quantity: 2, isChecked: true, number: 6, toggle: {})
+                    ItemRow(name: "Greek yogurt", detail: "Added by Sam", detailTone: .info, isChecked: false,
+                            number: 7, isNext: true, showsDivider: true, toggle: {})
+                    ItemRow(name: "Kirkland pesto", isChecked: false, number: 8, showsDivider: true,
+                            accessory: AnyView(UrgencyTag(text: "GUESSED")), toggle: {})
+                }
+            }
+        case "storemap":
+            VStack(spacing: 10) {
+                TripLCD(label: "In the store · 12 min", main: "Next 7 · Greek yogurt", number: 5, unit: "left",
+                        strip: [StripCell(fill: .full), StripCell(fill: .full), StripCell(fill: .half, marked: true),
+                                StripCell(fill: .empty), StripCell(fill: .empty)],
+                        legend: ["Entry", "Zone 03 Dairy", "Exit"])
+                HStack(spacing: 8) {
+                    WalkBadge(number: 6, isNext: false)
+                    WalkBadge(number: 7, isNext: true)
+                    WalkBadge(number: 8, isNext: false)
+                    Spacer()
+                }
             }
         case "restock":
-            SKGroup(caption: "Before the next trip · 3") {
-                SampleRow(title: "Milk", subtitle: "On the list · Every week · last 7 days ago", checked: true,
-                          chip: "DUE", strikes: false)
-                SampleRow(title: "Butter", subtitle: "Every 2 weeks · last 14 days ago", checked: false, chip: "DUE")
-                SampleRow(title: "Dish soap", subtitle: "Every 3 weeks · last 33 days ago", checked: false,
-                          chip: "LATE")
+            VStack(alignment: .leading, spacing: 6) {
+                ZoneHeader(title: "Before the next trip", count: "3", state: .next)
+                ListCard {
+                    ItemRow(name: "Milk", detail: "On the list · Every week · last 7 days ago", isChecked: true,
+                            accessory: AnyView(UrgencyTag(text: "DUE")), toggle: {})
+                    ItemRow(name: "Butter", detail: "Every 2 weeks · last 14 days ago", isChecked: false,
+                            showsDivider: true, accessory: AnyView(UrgencyTag(text: "DUE")), toggle: {})
+                    ItemRow(name: "Dish soap", detail: "Every 3 weeks · last 33 days ago", isChecked: false,
+                            showsDivider: true, accessory: AnyView(UrgencyTag(text: "LATE", late: true)), toggle: {})
+                }
             }
         case "zones":
             SKGroup(caption: "Walking order") {
@@ -407,11 +458,13 @@ private struct TourPicture: View {
             }
         case "trips":
             VStack(spacing: 10) {
-                SKDisplay(title: "In the store", detail: "COSTCO", message: "3 in cart", number: 11, digits: 3,
-                          unit: "LEFT", live: true)
-                SKGroup(caption: "In the cart") {
-                    SampleRow(title: "Paper towels", subtitle: nil, checked: true, chip: nil)
-                    SampleRow(title: "Olive oil", subtitle: nil, checked: true, chip: nil)
+                TripLCD(label: "In the store · 18 min", main: "Next 4 · Rice", number: 11, unit: "left",
+                        strip: [StripCell(fill: .full), StripCell(fill: .half, marked: true), StripCell(fill: .empty),
+                                StripCell(fill: .empty)],
+                        legend: ["Entry", "Zone 02 Pantry", "Exit"])
+                ListCard {
+                    ItemRow(name: "Paper towels", isChecked: true, number: 1, toggle: {})
+                    ItemRow(name: "Olive oil", isChecked: true, number: 2, showsDivider: true, toggle: {})
                 }
             }
         case "learning":
@@ -421,13 +474,16 @@ private struct TourPicture: View {
                     SKRow(title: "Olive oil", subtitle: "3rd of 5") { SKChip("0.50", minWidth: 52) }
                     SKRow(title: "Rotisserie chicken", subtitle: "5th of 5") { SKChip("1.00", minWidth: 52) }
                 }
-                SKGroup(caption: "Look for it") {
-                    SampleRow(title: "Advent calendar", subtitle: "Seen anywhere from 15% to 80% of the way in",
-                              checked: false, chip: nil)
+                ListCard {
+                    ItemRow(name: "Advent calendar", detail: "Look for it · seen from 15% to 80% of the way in",
+                            detailTone: .alert, isChecked: false, toggle: {})
                 }
             }
         case "sharing":
-            SKDisplay(title: "At home", detail: "SAM IN STORE", message: "Ready", number: 9, digits: 3, unit: "LEFT")
+            VStack(alignment: .leading, spacing: 10) {
+                PresencePill(text: "Sam in the store", lit: true)
+                TripLCD(label: "At home · Costco", main: "4 stops in the walk", number: 9, unit: "on list")
+            }
         case "milestones":
             VStack(spacing: 10) {
                 LevelMeter(level: Milestones.level(done: 6, of: 14), total: 14)
@@ -443,35 +499,15 @@ private struct TourPicture: View {
         }
     }
 
-    private func day(_ offset: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: offset, to: Calendar.current.startOfDay(for: Date())) ?? Date()
-    }
-}
-
-/// A list row in a tour picture: the check square, the name and its note, and a chip.
-private struct SampleRow: View {
-    let title: String
-    let subtitle: String?
-    let checked: Bool
-    let chip: String?
-    var strikes = true
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Toggle(isOn: .constant(checked)) { EmptyView() }
-                .toggleStyle(.sk1Square)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.sk1(SK1.TypeScale.rowTitle))
-                    .strikethrough(checked && strikes)
-                    .sk1Ink(soft: checked && strikes)
-                if let subtitle { Text(subtitle).sk1Hint() }
+    /// A sample week: shopped three days ago, the next trip tomorrow.
+    private var weekStrip: [StripCell] {
+        (-3...3).map { offset in
+            switch offset {
+            case -3: return StripCell(fill: .full)
+            case 1: return StripCell(fill: .empty, marked: true, text: "NEXT")
+            default: return StripCell(fill: .empty)
             }
-            Spacer(minLength: 8)
-            if let chip { SKChip(chip, minWidth: 44) }
         }
-        .padding(.vertical, 8)
-        .frame(minHeight: 44)
     }
 }
 
