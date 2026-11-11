@@ -42,6 +42,9 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Buck Fifty
+        # The build number from the build settings, so the TestFlight workflow's CURRENT_PROJECT_VERSION (the commit
+        # count) reaches the app. Without it XcodeGen writes a fixed "1", and App Store Connect refuses a second build 1.
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # Only standard encryption (HTTPS, iCloud), so TestFlight doesn't ask about export compliance on each build.
         ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
