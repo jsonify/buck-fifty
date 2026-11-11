@@ -190,18 +190,24 @@ struct TripLCD: View {
 
 // MARK: Adding
 
-/// The add field: type a name, Return or + adds it.
+/// The add field: type a name, Return or + adds it, and the keyboard stays up for the next one.
 struct AddBar: View {
     @Binding var draft: String
     let prompt: String
     let add: () -> Void
+    /// The field keeps the keyboard after Return, so a list can be typed one thing after another.
+    @FocusState private var typing: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             SKTextField("Add an item", text: $draft, prompt: prompt)
                 .textInputAutocapitalization(.sentences)
-                .submitLabel(.done)
-                .onSubmit(add)
+                .submitLabel(.next)
+                .focused($typing)
+                .onSubmit {
+                    add()
+                    typing = true
+                }
             Button(action: add) { Image(systemName: "plus") }
                 .buttonStyle(.sk1Key())
                 .accessibilityLabel("Add")

@@ -183,3 +183,9 @@ final class Navigator {
         choosingStore = false
     }
 }
+
+/// At home the list is in your own order (`HomeOrder`).
+extension ListRow: HomeOrderable {
+    var homePlace: Double? { entry.homePlace }
+    var addedAt: Date? { entry.createdAt }
+}

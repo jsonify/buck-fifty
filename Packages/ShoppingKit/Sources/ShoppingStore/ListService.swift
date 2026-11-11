@@ -137,10 +137,13 @@ public struct ListService {
             open.quantity += 1
             return open
         }
+        // New things go at the bottom of your order at home.
+        let place = HomeOrder.next(after: store.entries.map(\.homePlace))
         let entry = insert(ListEntry.self, alongside: store)
         entry.id = UUID()
         entry.quantity = 1
         entry.createdAt = now
+        entry.homeOrder = NSNumber(value: place)
         entry.addedByID = shopper.id
         entry.addedByName = shopper.name
         entry.item = item
