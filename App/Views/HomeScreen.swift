@@ -449,7 +449,8 @@ struct NewStoreSheet: View {
     }
 }
 
-/// The You tab: your name, how milestones show and all of them, the tour and the guide, and Map the store.
+/// The You tab: your name, how milestones show and all of them, the tour and the guide, trips by location, and Map
+/// the store.
 struct YouScreen: View {
     /// The store milestones open on.
     let store: Store?
@@ -458,6 +459,8 @@ struct YouScreen: View {
     @State private var showingTour = false
     @State private var showingGuide = false
     @State private var showingMilestones = false
+    @Environment(\.scenePhase) private var scenePhase
+    private var fence: StoreFence { StoreFence.shared }
 
     var body: some View {
         @Bindable var profile = profile
@@ -505,6 +508,32 @@ struct YouScreen: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    SKGroup(caption: "Trips by location", note: locationNote) {
+                        SKRow(title: "Start and end by location", subtitle: "Starts as you arrive, ends as you leave") {
+                            Toggle(isOn: $profile.tripsFollowLocation) { EmptyView() }
+                                .toggleStyle(.sk1Switch)
+                                .accessibilityLabel("Start and end trips by location")
+                        }
+                        if profile.tripsFollowLocation, let store {
+                            SKRow(title: store.displayName, subtitle: pinSubtitle(store)) {
+                                Button(fence.isLocating ? "Finding…" : "Pin here") { fence.pinHere(store) }
+                                    .buttonStyle(.sk1Key(size: .small))
+                                    .disabled(fence.isLocating)
+                                    .accessibilityLabel("Pin \(store.displayName) where you are now")
+                            }
+                            if let pin = fence.pin(for: store) {
+                                SKRow(title: "Radius") {
+                                    SKSegmented(selection: Binding(get: { pin.radius },
+                                                                   set: { fence.setRadius($0, for: store) }),
+                                                options: StorePin.radii.map { radius in
+                                                    SKSegmented<Double>.Option(radius, "\(Int(radius)) m",
+                                                                               help: radiusHelp(radius))
+                                                }, height: 30)
+                                }
+                            }
+                        }
+                    }
+                    .onChange(of: profile.tripsFollowLocation) { _, on in fence.setOn(on) }
                     SKGroup(caption: "Experimental", note: mappingNote) {
                         SKRow(title: "Map the store", subtitle: "Builds a floor plan from your trips") {
                             Toggle(isOn: $profile.mapsStore) { EmptyView() }
@@ -527,8 +556,44 @@ struct YouScreen: View {
         .sheet(isPresented: $showingMilestones) { MilestonesSheet(store: store) }
         .fullScreenCover(isPresented: $showingTour) { TourSheet() }
         .onAppear {
+            fence.refresh()
             guard Launch.isDemo else { return }
             showingMilestones = Launch.demoScreen.hasPrefix("milestones")
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { fence.refresh() }
+        }
+    }
+
+    private func pinSubtitle(_ store: Store) -> String {
+        guard let pin = fence.pin(for: store) else {
+            return "Not pinned yet: tap Pin here in the store, or Start trip there"
+        }
+        return "Pinned, with \(Int(pin.radius)) m around it"
+    }
+
+    private func radiusHelp(_ radius: Double) -> String {
+        switch radius {
+        case ..<150: return "A small store"
+        case ..<300: return "A big store and its car park"
+        default: return "A big store in a wide car park"
+        }
+    }
+
+    private var locationNote: String {
+        guard profile.tripsFollowLocation, !Launch.isDemo else {
+            return "Walk into a store you've pinned and a trip starts, if there's something on the list. Leave, and "
+                + "it ends, even if you forgot to tap Done."
+        }
+        switch fence.authorization {
+        case .denied, .restricted:
+            return "Location is off for Buck Fifty. Turn it on in Settings, Buck Fifty, Location, and choose Always."
+        case .authorizedWhenInUse:
+            return "Location is only While Using the App, so a trip only ends as you leave with the app open. Choose "
+                + "Always in Settings, Buck Fifty, Location, for it to work with the app closed."
+        default:
+            return "A trip starts as you arrive at a pinned store with something on the list, and ends as you leave, "
+                + "even with the app closed. Pins stay on this phone; your location never leaves it."
         }
     }
 

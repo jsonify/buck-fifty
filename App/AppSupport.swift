@@ -40,6 +40,10 @@ final class Profile {
     var mapsStore: Bool {
         didSet { defaults.set(mapsStore, forKey: "mapsStore") }
     }
+    /// Start a trip on walking into a pinned store and end it on leaving (`StoreFence`). Off until turned on.
+    var tripsFollowLocation: Bool {
+        didSet { defaults.set(tripsFollowLocation, forKey: "tripsFollowLocation") }
+    }
     /// Whether the tour has been seen (or skipped): it opens by itself until then.
     var hasSeenTour: Bool {
         didSet { defaults.set(hasSeenTour, forKey: "hasSeenTour") }
@@ -73,6 +77,7 @@ final class Profile {
         }
         name = defaults.string(forKey: "shopperName") ?? ""
         mapsStore = defaults.bool(forKey: "mapsStore")
+        tripsFollowLocation = defaults.bool(forKey: "tripsFollowLocation")
         hasSeenTour = defaults.bool(forKey: "hasSeenTour")
         listGrouping = defaults.string(forKey: "listGrouping").flatMap(ListGrouping.init(rawValue:)) ?? .zone
         milestoneStyle = defaults.string(forKey: "milestoneStyle").flatMap(MilestoneStyle.init(rawValue:)) ?? .checklist

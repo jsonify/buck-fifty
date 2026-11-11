@@ -107,6 +107,12 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   points. The map key on the list opens the floor plan: items coloured by zone, with your last mapped walk over
   them. Keep the app open while you shop. Only trips started at the door are mapped, and learning the store's order
   works the same either way. It asks for Motion & Fitness access; the walk stays on the phone and in the shared list.
+- **Trips by location (off by default).** Turn on **Start and end by location** on the You tab, and each store
+  pinned on the phone (**Pin here**, or the first **Start trip** there) becomes a circle of 100, 200 or 400 m that
+  the system watches with `CLMonitor`, even with the app closed. Arriving starts a trip if the list has something on
+  it; leaving ends it like **Done**, so a forgotten trip doesn't run on until it goes quiet. A trip with nothing
+  checked off is dropped. The rules are `LocationTrips` in `ShoppingCore`; the app side is `App/StoreFence.swift`.
+  Pins are kept in the phone's settings, not the shared list, so the iCloud schema doesn't change.
 - **Shared lists, live.** Tap the share key on a list to invite someone through Messages, Mail or a link. They
   tap the invitation and the list appears in their app. From then on, anything either of you adds, edits or checks
   off shows up on the other phone within seconds. On a shared list, rows say who added something ("Added by

@@ -21,6 +21,7 @@ final class AppModel {
         if Launch.isDemo {
             profile.name = "Jason"
             profile.mapsStore = true
+            profile.tripsFollowLocation = true
             // Two features tried, so Milestones shows some ticked; the -levels screens show the Levels style.
             profile.markTried(Milestones.Try.restock)
             profile.markTried(Milestones.Try.everything)
@@ -139,6 +140,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         application.registerForRemoteNotifications()
+        // Before anything else: a store's circle crossed with the app closed relaunches it in the background, and the
+        // crossing is only handed over once the monitor is made again.
+        StoreFence.shared.resume()
         return true
     }
 
