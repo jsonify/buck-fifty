@@ -140,6 +140,11 @@ jobs:
             CURRENT_PROJECT_VERSION="$build_number" \
             archive 2>&1 | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|warning:|ARCHIVE (SUCCEEDED|FAILED)" || true
           grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/archive.log"
+          # App Store Connect refuses a build number it has seen, so check it made it into the app.
+          app=$(ls -d "$RUNNER_TEMP"/BuckFifty.xcarchive/Products/Applications/*.app | head -1)
+          version=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$app/Info.plist")
+          echo "CFBundleVersion: $version"
+          test "$version" = "$build_number" || { echo "::error::The app's CFBundleVersion is $version, not $build_number"; exit 1; }
 
       # destination=upload: the export sends the build straight to App Store Connect, using the API key. An App Store
       # export also signs for the production iCloud and push environments.
