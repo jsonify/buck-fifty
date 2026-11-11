@@ -73,8 +73,12 @@ enum Guide {
                     + "They have no number.",
                 "Hold an item and drag it onto another: it takes that one's place in the walk, and its zone. The "
                     + "list remembers where you put it.",
-                "At home each zone is one stop. In the store the list follows your walk, so a zone can come round "
-                    + "twice.",
+                "Each zone is one stop, in the order your walk reaches it, so a zone never shows up twice. The only "
+                    + "numbers on the list are the walk numbers on the right; the rail's dots turn blue with a tick as "
+                    + "each stop is done.",
+                "The switch over the list groups it By zone (stops on the rail, with walk numbers) or A to Z (one "
+                    + "card by name, each row saying its zone, no numbers and no dragging). Your phone remembers "
+                    + "which.",
                 "At home the list starts with a strip of what's running low, one tap each.",
                 "On a shared list, rows say who added them, or whose cart they're in.",
                 "The LCD says At home or In the store and how many things are left. In the store it names the next "
@@ -431,7 +435,7 @@ private struct TourPicture: View {
                 TripLCD(label: "In the store · 12 min", main: "Next 7 · Greek yogurt", number: 5, unit: "left",
                         strip: [StripCell(fill: .full), StripCell(fill: .full), StripCell(fill: .half, marked: true),
                                 StripCell(fill: .empty), StripCell(fill: .empty)],
-                        legend: ["Entry", "Zone 03 Dairy", "Exit"])
+                        legend: ["Entry", "Dairy", "Exit"])
                 HStack(spacing: 8) {
                     WalkBadge(number: 6, isNext: false)
                     WalkBadge(number: 7, isNext: true)
@@ -462,7 +466,7 @@ private struct TourPicture: View {
                 TripLCD(label: "In the store · 18 min", main: "Next 4 · Rice", number: 11, unit: "left",
                         strip: [StripCell(fill: .full), StripCell(fill: .half, marked: true), StripCell(fill: .empty),
                                 StripCell(fill: .empty)],
-                        legend: ["Entry", "Zone 02 Pantry", "Exit"])
+                        legend: ["Entry", "Pantry", "Exit"])
                 ListCard {
                     ItemRow(name: "Paper towels", isChecked: true, number: 1, toggle: {})
                     ItemRow(name: "Olive oil", isChecked: true, number: 2, showsDivider: true, toggle: {})

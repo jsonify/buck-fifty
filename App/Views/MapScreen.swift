@@ -36,7 +36,7 @@ struct MapScreen: View {
     private var trip: Trip? { service.activeTrip(among: Array(openTrips), for: profile.shopper) }
 
     var body: some View {
-        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items), inStore: trip != nil)
+        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items))
         VStack(spacing: 10) {
             ScreenHeader(storeName: store.displayName, title: "Store map",
                          chooseStore: { navigator.choosingStore = true }) {

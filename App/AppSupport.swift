@@ -6,8 +6,9 @@ import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
 /// previews); `-demoScreen <name>` opens one screen: home (with home-checklist and home-levels scrolled to Coming
-/// up), list (default), add, trip, edit, zone (the zone map), zones, floorplan, everything, map (the Map tab, during
-/// a trip), restock, you, stores (the store chooser), tour, guide, milestones, or milestones-levels.
+/// up), list (default), list-az (the list A to Z), add, trip, edit, zone (the zone map), zones, floorplan,
+/// everything, map (the Map tab, during a trip), restock, you, stores (the store chooser), tour, guide, milestones,
+/// or milestones-levels.
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
     static var isDemo: Bool { arguments.contains("-demo") }
@@ -44,6 +45,10 @@ final class Profile {
         didSet { defaults.set(hasSeenTour, forKey: "hasSeenTour") }
     }
 
+    /// How the List tab groups the list: a stop per zone, or one A to Z card.
+    var listGrouping: ListGrouping {
+        didSet { defaults.set(listGrouping.rawValue, forKey: "listGrouping") }
+    }
     /// How the home screen shows milestones (issue #23).
     var milestoneStyle: MilestoneStyle {
         didSet { defaults.set(milestoneStyle.rawValue, forKey: "milestoneStyle") }
@@ -69,6 +74,7 @@ final class Profile {
         name = defaults.string(forKey: "shopperName") ?? ""
         mapsStore = defaults.bool(forKey: "mapsStore")
         hasSeenTour = defaults.bool(forKey: "hasSeenTour")
+        listGrouping = defaults.string(forKey: "listGrouping").flatMap(ListGrouping.init(rawValue:)) ?? .zone
         milestoneStyle = defaults.string(forKey: "milestoneStyle").flatMap(MilestoneStyle.init(rawValue:)) ?? .checklist
         tried = Set(defaults.stringArray(forKey: "triedFeatures") ?? [])
         seenMilestones = Set(defaults.stringArray(forKey: "seenMilestones") ?? [])
@@ -100,6 +106,14 @@ final class Profile {
     }
 
     var shopper: Shopper { Shopper(id: id, name: name.isEmpty ? "Me" : name) }
+}
+
+/// How the List tab groups the list.
+enum ListGrouping: String, CaseIterable {
+    /// A stop per zone in walking order, on the rail, with walk numbers.
+    case zone
+    /// Everything on one card, A to Z, each row saying its zone.
+    case alphabetical
 }
 
 /// How the home screen shows milestones: two takes on issue #23, to choose between on the You tab.

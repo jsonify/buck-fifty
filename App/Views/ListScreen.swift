@@ -27,7 +27,7 @@ struct StopRow: Identifiable {
 /// walk's stops on its strip; under the add field each stop hangs off the route rail in walking order (blue once
 /// done, orange for the next one), its items on a white card with their walk numbers, the same numbers as the pins on
 /// the Map. Checked items stay in their zone, struck through. Hold an item and drag it onto another to move it in the
-/// walk.
+/// walk. A switch over the list shows it A to Z instead (`ListGrouping`), on one card without the rail.
 struct ListScreen: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
@@ -65,7 +65,7 @@ struct ListScreen: View {
     private var share: ShareSummary { sharing.summary(for: store) }
 
     var body: some View {
-        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items), inStore: trip != nil)
+        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items))
         let needed = service.neededNotOnList(in: store)
         VStack(spacing: 10) {
             ScreenHeader(storeName: store.displayName, title: "Shopping list",
@@ -90,9 +90,15 @@ struct ListScreen: View {
                                 .sk1Hint()
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.horizontal, 4)
+                        } else {
+                            groupingSwitch.padding(.horizontal, 4).padding(.bottom, 12)
                         }
-                        ForEach(walk.stops, id: \.id) { stop in
-                            stopView(stop, walk: walk)
+                        if profile.listGrouping == .alphabetical {
+                            if !walk.rows.isEmpty { alphabeticalList(walk).padding(.horizontal, 4) }
+                        } else {
+                            ForEach(walk.stops, id: \.id) { stop in
+                                stopView(stop, walk: walk)
+                            }
                         }
                     }
                 }
@@ -157,7 +163,7 @@ struct ListScreen: View {
                            state: stop.state)
                 ListCard {
                     ForEach(StopRow.rows(of: stop)) { item in
-                        row(item, isNext: item.id == nextID)
+                        walkRow(item, isNext: item.id == nextID)
                     }
                 }
                 if stop.kind == .lookForIt {
@@ -174,22 +180,35 @@ struct ListScreen: View {
         stop.state == .next && trip != nil ? "\(stop.title) · next" : stop.title
     }
 
-    private func row(_ item: StopRow, isNext: Bool) -> some View {
-        let entry = item.row.entry
-        let guessed = entry.item?.isZoneGuessed == true && !entry.isChecked
-        let lookFor = self.lookFor(item.row)
-        return ItemRow(name: entry.displayName, detail: detail(entry, lookFor: lookFor),
-                       detailTone: lookFor != nil ? .alert : .soft, quantity: entry.quantity,
-                       isChecked: entry.isChecked, number: item.number, isNext: isNext,
-                       showsDivider: item.index > 0,
-                       accessory: guessed ? AnyView(guessedChip(entry)) : nil,
-                       toggle: { actions.toggle(entry) })
-            .onTapGesture { actions.toggle(entry) }
-            .contextMenu {
-                Button("Edit", systemImage: "pencil") { editing = Editing(entry: entry) }
-                Button("Remove from list", systemImage: "trash", role: .destructive) { remove(entry) }
+    /// The switch over the list: a stop per zone in walking order, or everything A to Z.
+    private var groupingSwitch: some View {
+        let grouping = Binding(get: { profile.listGrouping }, set: { profile.listGrouping = $0 })
+        return SKSegmented(selection: grouping, options: [
+            SKSegmented<ListGrouping>.Option(.zone, "By zone", help: "A stop per zone, in walking order"),
+            SKSegmented<ListGrouping>.Option(.alphabetical, "A to Z", help: "Everything on one card, by name"),
+        ], height: 30)
+    }
+
+    /// The list A to Z on one card: no rail and no walk numbers, each row saying its zone. Checked items stay in
+    /// place, struck through.
+    private func alphabeticalList(_ walk: WalkModel) -> some View {
+        let rows = ListOrdering.alphabetical(walk.rows)
+        return VStack(alignment: .leading, spacing: 6) {
+            ZoneHeader(title: "A to Z", count: walk.left == 0 ? "All in" : "\(walk.left) left",
+                       state: walk.left == 0 ? .done : .ahead)
+            ListCard {
+                ForEach(Array(rows.enumerated()), id: \.element.entry.objectID) { index, row in
+                    itemRow(row, number: nil, index: index, isNext: false, showsZone: true)
+                }
             }
-            .accessibilityAction(named: "Edit") { editing = Editing(entry: entry) }
+        }
+        .padding(.bottom, 14)
+    }
+
+    /// A row of the walk: it can be dragged onto another to move it in the walk.
+    private func walkRow(_ item: StopRow, isNext: Bool) -> some View {
+        let entry = item.row.entry
+        return itemRow(item.row, number: item.number, index: item.index, isNext: isNext, showsZone: false)
             // Hold and drag an item onto another to move it to that place in the walk (and that zone).
             .draggable(entry.id?.uuidString ?? "") { SKChip(entry.displayName) }
             .dropDestination(for: String.self) { ids, _ in
@@ -208,6 +227,27 @@ struct ListScreen: View {
             }
     }
 
+    /// An item: tap to check it off, hold to edit or remove it. With `showsZone` (A to Z) its detail starts with its
+    /// zone.
+    private func itemRow(_ row: ListRow, number: Int?, index: Int, isNext: Bool, showsZone: Bool) -> some View {
+        let entry = row.entry
+        let guessed = entry.item?.isZoneGuessed == true && !entry.isChecked
+        let lookFor = self.lookFor(row)
+        let zone = showsZone && lookFor == nil ? entry.item?.storeZone?.displayName ?? ListOrdering.unzonedTitle : nil
+        return ItemRow(name: entry.displayName, detail: detail(entry, lookFor: lookFor, zone: zone),
+                       detailTone: lookFor != nil ? .alert : .soft, quantity: entry.quantity,
+                       isChecked: entry.isChecked, number: number, isNext: isNext,
+                       showsDivider: index > 0,
+                       accessory: guessed ? AnyView(guessedChip(entry)) : nil,
+                       toggle: { actions.toggle(entry) })
+            .onTapGesture { actions.toggle(entry) }
+            .contextMenu {
+                Button("Edit", systemImage: "pencil") { editing = Editing(entry: entry) }
+                Button("Remove from list", systemImage: "trash", role: .destructive) { remove(entry) }
+            }
+            .accessibilityAction(named: "Edit") { editing = Editing(entry: entry) }
+    }
+
     private func guessedChip(_ entry: ListEntry) -> some View {
         Button { editing = Editing(entry: entry) } label: { SKChip("GUESSED", minWidth: 64) }
             .buttonStyle(.plain)
@@ -222,10 +262,12 @@ struct ListScreen: View {
         return seen
     }
 
-    /// The note, and on a shared list who added it or has it in their cart when that isn't you.
-    private func detail(_ entry: ListEntry, lookFor: String?) -> String? {
+    /// The zone (A to Z only), the note, and on a shared list who added it or has it in their cart when that isn't
+    /// you.
+    private func detail(_ entry: ListEntry, lookFor: String?, zone: String? = nil) -> String? {
         var parts: [String] = []
         if let lookFor { parts.append(lookFor) }
+        if let zone { parts.append(zone) }
         if let note = entry.note, !note.isEmpty { parts.append(note) }
         if share.isShared {
             if entry.isChecked, let id = entry.checkedByID, id != profile.id, let name = entry.checkedByName {
@@ -310,7 +352,7 @@ struct ListScreen: View {
     /// neighbours, and `target`'s zone if it has one.
     private func move(_ id: String?, onto target: ListEntry) -> Bool {
         dropTarget = nil
-        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items), inStore: trip != nil)
+        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items))
         let rows = walk.unchecked
         guard let id, let from = rows.firstIndex(where: { $0.entry.id?.uuidString == id }),
               let to = rows.firstIndex(where: { $0.entry == target }), from != to,
@@ -415,10 +457,7 @@ extension WalkModel {
         if let trip {
             let minutes = Int(now.timeIntervalSince(trip.startedAt ?? now) / 60)
             let main = next.map { "Next \($0.number) · \($0.entry.entry.displayName)" } ?? "All in · tap Done"
-            let middle = nextStop.map { stop -> String in
-                if case .zone(let index) = stop.kind { return "Zone \(String(format: "%02d", index + 1)) \(stop.title)" }
-                return stop.title
-            } ?? "Checkout"
+            let middle = nextStop?.title ?? "Checkout"
             return TripLCD(label: "In the store · \(minutes) min", main: main, number: left, unit: "left",
                            strip: strip, legend: ["Entry", middle, "Exit"])
         }

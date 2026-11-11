@@ -26,6 +26,7 @@ final class AppModel {
             profile.markTried(Milestones.Try.everything)
             profile.forgetSeenMilestones()
             profile.milestoneStyle = Launch.demoScreen.hasSuffix("-levels") ? .levels : .checklist
+            profile.listGrouping = Launch.demoScreen == "list-az" ? .alphabetical : .zone
         }
         self.profile = profile
         persistence = AppData.makePersistence(shopper: profile.shopper)

@@ -136,6 +136,16 @@ final class LearnedOrderTests: XCTestCase {
         XCTAssertEqual(Set(sections.map(\.id)).count, sections.count)
     }
 
+    func testAlphabeticalIgnoresZonesAndCheckOffs() {
+        let entries = [
+            Entry(sortName: "steak", zoneIndex: 2, learnedPosition: 0.5),
+            Entry(sortName: "Coffee", zoneIndex: 1, isChecked: true),
+            Entry(sortName: "Bananas", zoneIndex: 0),
+            Entry(sortName: "Écorce", zoneIndex: nil),
+        ]
+        XCTAssertEqual(ListOrdering.alphabetical(entries).map(\.sortName), ["Bananas", "Coffee", "Écorce", "steak"])
+    }
+
     func testZoneAverages() {
         let averages = ListOrdering.zoneAverages([(zone: 0, position: 0.2), (zone: 0, position: 0.4),
                                                   (zone: 1, position: nil), (zone: nil, position: 0.9)])

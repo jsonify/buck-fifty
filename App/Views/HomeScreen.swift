@@ -40,7 +40,7 @@ struct HomeScreen: View {
 
     var body: some View {
         let now = Date()
-        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items), inStore: false)
+        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items))
         let low = service.neededNotOnList(in: store, now: now)
         let rhythm = service.rhythm(of: store)
         let milestones = MilestoneBoard.milestones(for: store, context: context, profile: profile, sharing: sharing)
