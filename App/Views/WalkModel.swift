@@ -23,8 +23,8 @@ struct WalkModel {
     let stops: [Walk.Stop<ListRow>]
     let next: (entry: ListRow, number: Int)?
 
-    /// At home each zone is one stop; in the store the stops follow the walk, so a zone can come round twice.
-    init(entries: [ListEntry], zones: [Zone], items: [Item], inStore: Bool) {
+    /// Each zone is one stop, in the order the walk first reaches it, so a zone never comes round twice.
+    init(entries: [ListEntry], zones: [Zone], items: [Item]) {
         let rows = entries.map { entry in
             ListRow(entry: entry, zoneIndex: entry.item?.storeZone.flatMap { zones.firstIndex(of: $0) })
         }
@@ -35,7 +35,7 @@ struct WalkModel {
         self.rows = rows
         self.zoneNames = zoneNames
         self.zonePositions = zonePositions
-        stops = Walk.stops(rows, zoneNames: zoneNames, zonePositions: zonePositions, oneSectionPerZone: !inStore)
+        stops = Walk.stops(rows, zoneNames: zoneNames, zonePositions: zonePositions, oneSectionPerZone: true)
         next = Walk.next(in: stops)
     }
 
@@ -87,10 +87,11 @@ struct WalkModel {
             .filter { !$0.isChecked && !$0.isWandering }
     }
 
-    /// The rail number of a stop: its zone's place in the walking order, two digits.
-    static func railLabel(_ stop: Walk.Stop<ListRow>) -> String {
+    /// The mark on a stop's rail node. Zones get none (the only numbers on the list are the walk numbers on the
+    /// right); Look for it is a question mark and No zone yet a dash.
+    static func railLabel(_ stop: Walk.Stop<ListRow>) -> String? {
         switch stop.kind {
-        case .zone(let index): return String(format: "%02d", index + 1)
+        case .zone: return nil
         case .unzoned: return "–"
         case .lookForIt: return "?"
         }

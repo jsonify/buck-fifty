@@ -363,26 +363,34 @@ struct ItemRow: View {
     }
 }
 
-/// A stop on the route rail: its number, blue once it's done, orange when it's next, open when it's ahead.
+/// A stop on the route rail: blue with a tick once it's done, orange when it's next, open when it's ahead.
 struct RailNode: View {
-    let text: String
+    /// A mark for a stop that isn't a zone (? for Look for it, – for No zone yet); nil for a zone, which shows a tick
+    /// once done and nothing before.
+    let text: String?
     let state: Walk.StopState
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         let p = SK1.palette(for: scheme)
-        Text(text)
-            .font(.system(size: 9.5, weight: .heavy))
-            .monospacedDigit()
-            .foregroundStyle(state == .ahead ? Color(sk1Hex: p.inkSoft) : .white)
-            .frame(width: 22, height: 22)
-            .background(Circle().fill(fill))
-            .overlay(Circle().strokeBorder(state == .ahead ? Color(sk1Hex: p.inkSoft).opacity(0.5) : .clear,
-                                           lineWidth: 1.5))
-            .background {
-                if state == .next { Circle().fill(Hybrid.orange.opacity(0.25)).padding(-4) }
+        Group {
+            if let text {
+                Text(text).font(.system(size: 9.5, weight: .heavy))
+            } else if state == .done {
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .black))
+            } else {
+                Color.clear
             }
-            .accessibilityHidden(true)
+        }
+        .foregroundStyle(state == .ahead ? Color(sk1Hex: p.inkSoft) : .white)
+        .frame(width: 22, height: 22)
+        .background(Circle().fill(fill))
+        .overlay(Circle().strokeBorder(state == .ahead ? Color(sk1Hex: p.inkSoft).opacity(0.5) : .clear,
+                                       lineWidth: 1.5))
+        .background {
+            if state == .next { Circle().fill(Hybrid.orange.opacity(0.25)).padding(-4) }
+        }
+        .accessibilityHidden(true)
     }
 
     private var fill: Color {

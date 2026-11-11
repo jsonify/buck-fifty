@@ -28,7 +28,9 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   red is Add and LATE.
 - **The list as a walk.** The List tab is the store's list on a rail from the door to the checkout: a stop per zone,
   each item numbered in the order you'll pick it up. The numbers are worked out as if nothing were checked, so they
-  stay put through a trip (`ShoppingCore/Walk.swift`). The LCD names the next thing to get, its strip a cell per stop.
+  stay put through a trip (`ShoppingCore/Walk.swift`). Each zone is one stop, so it never shows up twice. The LCD
+  names the next thing to get, its strip a cell per stop. A switch over the list shows it A to Z instead: one card by
+  name, each row saying its zone.
 - **Map: the same trip on the store.** The Map tab draws the zones (from the store's floor plan when it has one,
   else in walking order), done zones blue and the next one orange, a pin per zone with what's left there (its first walk
   number and a count), the walk so far dashed from the door, and the stops still to do under it.

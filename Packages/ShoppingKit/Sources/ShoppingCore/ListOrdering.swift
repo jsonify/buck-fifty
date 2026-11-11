@@ -139,6 +139,16 @@ public enum ListOrdering {
         return sections
     }
 
+    /// `entries` A to Z by name, for the list shown alphabetically rather than by zone. Checked entries stay where
+    /// their name puts them (struck through), so checking one off doesn't move anything.
+    public static func alphabetical<E: ListSortable>(_ entries: [E]) -> [E] {
+        entries.sorted { a, b in
+            let na = ItemName.normalized(a.sortName), nb = ItemName.normalized(b.sortName)
+            if na != nb { return na < nb }
+            return a.sortName < b.sortName
+        }
+    }
+
     /// New learned positions after a drag moves the unchecked entry at `from` to `to`. `keys` are the unchecked
     /// entries' walk positions in list order (`walkPosition`, nil for the entries at the end with none). Returns the
     /// position to give each entry that needs one, by its index in `keys`: the moved entry lands between its new
