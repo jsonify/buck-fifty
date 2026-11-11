@@ -1,0 +1,194 @@
+name: TestFlight
+
+# Archives Buck Fifty on a macOS runner, signs it for the App Store and uploads it to TestFlight, so a new build
+# reaches the phone without building on a Mac. Runs on every push to main that touches the app or its package, and on
+# demand (Actions › TestFlight › Run workflow). Adapted from Meetball's.
+#
+# Needs these repository secrets (README, "TestFlight"):
+#   APP_STORE_CONNECT_KEY_ID        App Store Connect API key ID
+#   APP_STORE_CONNECT_ISSUER_ID     its issuer ID
+#   APP_STORE_CONNECT_KEY           the .p8 file's contents (-----BEGIN PRIVATE KEY----- …)
+#   DISTRIBUTION_CERTIFICATE_P12    an Apple Distribution certificate and its private key, exported as .p12, base64
+#   DISTRIBUTION_CERTIFICATE_PASSWORD  the .p12's password
+# Until they're all set, the run says so and does nothing.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    # What goes into the app. A docs- or CI-only change doesn't upload a build; run the workflow by hand if one was
+    # missed.
+    paths:
+      - App/**
+      - Packages/**
+      - project.yml
+      - .github/workflows/testflight.yml
+
+# One upload at a time, and never cancel one halfway.
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      TEAM_ID: TS339TNM5P
+      APP_ID: com.jsonify.buckfifty
+      KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      KEY: ${{ secrets.APP_STORE_CONNECT_KEY }}
+      CERT_P12: ${{ secrets.DISTRIBUTION_CERTIFICATE_P12 }}
+      CERT_PASSWORD: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
+    steps:
+      - name: Check secrets
+        id: secrets
+        shell: bash
+        run: |
+          missing=()
+          for name in KEY_ID ISSUER_ID KEY CERT_P12 CERT_PASSWORD; do [ -n "${!name}" ] || missing+=("$name"); done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning::TestFlight secrets aren't set (missing: ${missing[*]}); nothing uploaded. See README, \"TestFlight\"."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          # The whole history: the build number is the commit count, so each upload is newer than the last.
+          fetch-depth: 0
+
+      - name: Select newest Xcode
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$NEWEST"
+          xcodebuild -version
+
+      - name: Generate Xcode project
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Resolve packages (SK1Kit)
+        if: steps.secrets.outputs.ready == 'true'
+        run: xcodebuild -project BuckFifty.xcodeproj -resolvePackageDependencies
+
+      # The distribution certificate goes in a throwaway keychain, and the API key is written where xcodebuild and
+      # Scripts/appstore-profiles.py can read it.
+      - name: Install signing certificate and API key
+        if: steps.secrets.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password=$(uuidgen)
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/dist.p12" -k "$keychain" -P "$CERT_PASSWORD" -A -t cert -f pkcs12
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/dist.p12"
+          security find-identity -v -p codesigning "$keychain"
+          serial=$(security find-certificate -c "Apple Distribution" -p "$keychain" | openssl x509 -noout -serial | cut -d= -f2)
+          test -n "$serial" || { echo "::error::DISTRIBUTION_CERTIFICATE_P12 holds no Apple Distribution certificate"; exit 1; }
+          echo "CERT_SERIAL=$serial" >> "$GITHUB_ENV"
+
+          mkdir -p "$RUNNER_TEMP/keys"
+          key_path="$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8"
+          printf '%s\n' "$KEY" > "$key_path"
+          echo "KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+      # Signing is manual: Xcode's automatic signing only signs for development when archiving and would need a
+      # development certificate here. Instead, a fresh App Store profile ("Buck Fifty CI <bundle ID>") comes from the
+      # App Store Connect API, with the App ID's iCloud and push capabilities, and the archive is signed with the
+      # distribution certificate directly.
+      - name: Create App Store provisioning profile
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: ASC_KEY_PATH="$KEY_PATH" python3 -I Scripts/appstore-profiles.py "$CERT_SERIAL" "$APP_ID"
+
+      - name: Archive
+        if: steps.secrets.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -o pipefail
+          build_number=$(git rev-list --count HEAD)
+          commit=$(git rev-parse --short HEAD)
+          echo "BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          # The app picks its profile by name; targets with none (the packages) get an empty one.
+          cat > "$RUNNER_TEMP/signing.xcconfig" <<EOF
+          CODE_SIGN_STYLE = Manual
+          CODE_SIGN_IDENTITY = Apple Distribution
+          CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
+          DEVELOPMENT_TEAM = $TEAM_ID
+          BUCKFIFTY_PROFILE_BuckFifty = Buck Fifty CI $APP_ID
+          PROVISIONING_PROFILE_SPECIFIER = \$(BUCKFIFTY_PROFILE_\$(TARGET_NAME))
+          EOF
+          cat "$RUNNER_TEMP/signing.xcconfig"
+          echo "Archiving build $build_number ($commit)"
+          xcodebuild -project BuckFifty.xcodeproj -scheme BuckFifty -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/BuckFifty.xcarchive" \
+            -xcconfig "$RUNNER_TEMP/signing.xcconfig" \
+            CURRENT_PROJECT_VERSION="$build_number" \
+            archive 2>&1 | tee "$RUNNER_TEMP/archive.log" | grep -E "error:|warning:|ARCHIVE (SUCCEEDED|FAILED)" || true
+          grep -q "ARCHIVE SUCCEEDED" "$RUNNER_TEMP/archive.log"
+
+      # destination=upload: the export sends the build straight to App Store Connect, using the API key. An App Store
+      # export also signs for the production iCloud and push environments.
+      - name: Upload to TestFlight
+        if: steps.secrets.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -o pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$APP_ID</key><string>Buck Fifty CI $APP_ID</string>
+            </dict>
+            <key>iCloudContainerEnvironment</key><string>Production</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/BuckFifty.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" \
+            2>&1 | tee "$RUNNER_TEMP/upload.log" | grep -E "error:|Upload|EXPORT (SUCCEEDED|FAILED)" || true
+          grep -q "EXPORT SUCCEEDED" "$RUNNER_TEMP/upload.log"
+          echo "### Build $BUILD_NUMBER uploaded to TestFlight" >> "$GITHUB_STEP_SUMMARY"
+          echo "It shows up in TestFlight once App Store Connect finishes processing it (usually 5–15 minutes)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up signing
+        if: always() && steps.secrets.outputs.ready == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/keys"
+
+      - name: Upload logs
+        if: always() && steps.secrets.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: buckfifty-testflight-logs
+          path: |
+            ${{ runner.temp }}/archive.log
+            ${{ runner.temp }}/upload.log
+          if-no-files-found: ignore

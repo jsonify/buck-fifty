@@ -94,15 +94,16 @@ enum Guide {
             ]),
         GuidePart(
             id: "storemap", title: "The Map tab", systemImage: "map.fill",
-            summary: "The same trip as the list, drawn on the store: each zone where it is, with the walk numbers "
-                + "pinned where you'll pick things up.",
+            summary: "The same trip as the list, drawn on the store: each zone where it is, with a pin for what's "
+                + "left there.",
             points: [
                 "Zones come from the store's floor plan when it has one (the Aurora Village layout does), else they're "
                     + "laid out in walking order from the door.",
                 "Blue zones are done, the orange one is next, the rest are still ahead. The dashed blue line is the "
                     + "walk so far, from the door; the orange dot is about where you are.",
-                "The pins are the same numbers as the list. Under the map, the next few stops and what's at them: tap "
-                    + "one to check it off.",
+                "Each zone with something left has a pin: the walk number of the first thing there, the same number "
+                    + "as on the list, with how many things are there when it's more than one. Under the map, the stops "
+                    + "still to do and what's at them: tap one to check it off.",
                 "It works without Map the store. With it on, the floor plan key shows where things really are, from "
                     + "your mapped trips.",
             ],

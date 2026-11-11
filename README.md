@@ -30,8 +30,8 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   each item numbered in the order you'll pick it up. The numbers are worked out as if nothing were checked, so they
   stay put through a trip (`ShoppingCore/Walk.swift`). The LCD names the next thing to get, its strip a cell per stop.
 - **Map: the same trip on the store.** The Map tab draws the zones (from the store's floor plan when it has one,
-  else in walking order), done zones blue and the next one orange, with the same walk numbers pinned in place, the
-  walk so far dashed from the door, and the next few stops under it.
+  else in walking order), done zones blue and the next one orange, a pin per zone with what's left there (its first walk
+  number and a count), the walk so far dashed from the door, and the stops still to do under it.
 - **Home: the next trip at a glance.** The LCD says when the next trip probably is and how much is on the list, over a
   week strip with the days you shopped and NEXT. Under it: the first few things on the list in store order, cards
   for what's due before the next trip, each with **Add** (or **Add all**), milestones, and the last 30 days in
@@ -147,6 +147,7 @@ Sharing needs two real iCloud accounts to try out: the simulator can't receive t
 | `project.yml` | The Xcode project, for [XcodeGen](https://github.com/yonaskolb/XcodeGen) |
 | `Makefile`, `Scripts/dist.sh` | Build, run in the Simulator, install on your iPhone (see below) |
 | `Scripts/screenshots.sh` | Builds the app for the simulator, runs it on sample data and screenshots each screen |
+| `.github/workflows/testflight.yml`, `Scripts/appstore-profiles.py` | Archive, sign and upload to TestFlight from GitHub (see "TestFlight" under CI) |
 | `Scripts/sk1-audit.sh` | Lists any native controls that have an SK-1 part (from SK1Kit) |
 | `App/Assets.xcassets`, `Scripts/make-icon.py` | The app icon (light, dark and tinted), drawn in code from SK1Kit's colours: the LCD reads 1.50, over the orange check key. `make-icon.py` explains how to redraw it |
 
@@ -172,7 +173,7 @@ does.
 With more than one iPhone connected, pick one with `DEVICE=<name> make install`: any unique part of its name will do, in any case, with straight or curly apostrophes (`DEVICE=kitties make install`). If a build fails, the errors are
 printed and the full log is at `build/dist.log`. `Scripts/dist.sh --help` lists the flags behind these.
 
-The demo store is in memory: `-demo` with `-demoScreen stores|list|restock|add|trip|edit|zones|tour|guide` opens one screen, which is
+The demo store is in memory: `-demo` with `-demoScreen home|list|map|restock|you|stores|add|trip|edit|zones|floorplan|tour|guide` opens one screen, which is
 what the screenshots use.
 
 ## CI
@@ -180,3 +181,34 @@ what the screenshots use.
 Every pull request runs one macOS job: the SK-1 audit and the package tests (warnings as errors). It then
 builds the app for the iOS Simulator, runs it, and uploads screenshots of each screen in light and dark as the
 `screenshots` artifact.
+
+### TestFlight (no Mac build needed)
+
+`.github/workflows/testflight.yml` (adapted from Meetball's) archives Buck Fifty on a GitHub macOS runner, signs it
+for the App Store and uploads it to TestFlight. It runs on every push to `main` that touches the app (`App/`,
+`Packages/` or `project.yml`), and by hand from Actions › TestFlight › Run workflow. The build number is the commit
+count, so each upload is newer than the last. Install the **TestFlight** app on the iPhone; new builds then arrive
+about 10 minutes after a run. Until the secrets below are set, the workflow says so and uploads nothing.
+
+One-time setup:
+1. **App ID and iCloud.** Build once with your team (`make install`) so automatic signing registers
+   `com.jsonify.buckfifty` with iCloud (CloudKit) and Push Notifications, then deploy the CloudKit schema to
+   production ("Setting up iCloud", step 3). TestFlight builds use the production container, so without it lists
+   don't sync or share.
+2. **App record.** In [App Store Connect](https://appstoreconnect.apple.com) › Apps › **+** › New App: platform iOS,
+   any name not already taken, bundle ID `com.jsonify.buckfifty`, any SKU. Under its **TestFlight** tab, add an
+   Internal Testing group with yourself in it.
+3. **API key.** The one Meetball uses works here too (same team). Otherwise: App Store Connect › Users and Access ›
+   Integrations › App Store Connect API › Team Keys › **+**, role **Admin** (each run creates a fresh App Store
+   profile, "Buck Fifty CI com.jsonify.buckfifty", through the API with `Scripts/appstore-profiles.py`). Download the
+   `.p8` and note its Key ID and the Issuer ID.
+4. **Distribution certificate.** The same Apple Distribution `.p12` as Meetball's (base64).
+5. **Secrets.** GitHub › this repo › Settings › Secrets and variables › Actions, the same five as Meetball:
+
+   | Secret | Value |
+   | --- | --- |
+   | `APP_STORE_CONNECT_KEY_ID` | the key's Key ID |
+   | `APP_STORE_CONNECT_ISSUER_ID` | the Issuer ID |
+   | `APP_STORE_CONNECT_KEY` | the whole `.p8` file, `-----BEGIN PRIVATE KEY-----` lines included |
+   | `DISTRIBUTION_CERTIFICATE_P12` | the `.p12`, base64 |
+   | `DISTRIBUTION_CERTIFICATE_PASSWORD` | the `.p12` password |
