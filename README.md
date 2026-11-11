@@ -30,8 +30,8 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   each item numbered in the order you'll pick it up. The numbers are worked out as if nothing were checked, so they
   stay put through a trip (`ShoppingCore/Walk.swift`). The LCD names the next thing to get, its strip a cell per stop.
 - **Map: the same trip on the store.** The Map tab draws the zones (from the store's floor plan when it has one,
-  else in walking order), done zones blue and the next one orange, with the same walk numbers pinned in place, the
-  walk so far dashed from the door, and the next few stops under it.
+  else in walking order), done zones blue and the next one orange, a pin per zone with what's left there (its first walk
+  number and a count), the walk so far dashed from the door, and the stops still to do under it.
 - **Home: the next trip at a glance.** The LCD says when the next trip probably is and how much is on the list, over a
   week strip with the days you shopped and NEXT. Under it: the first few things on the list in store order, cards
   for what's due before the next trip, each with **Add** (or **Add all**), milestones, and the last 30 days in

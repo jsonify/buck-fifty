@@ -44,11 +44,14 @@ struct MapScreen: View {
             }
             walk.lcd(trip: trip, store: store, now: Date())
                 .padding(.horizontal, 14)
-            WalkMapView(map: WalkMap(walk: walk, inStore: trip != nil))
+            let map = WalkMap(walk: walk, inStore: trip != nil)
+            WalkMapView(map: map)
                 .padding(8)
                 .frame(maxWidth: .infinity)
-                .frame(height: 250)
+                .aspectRatio(CGFloat(map.aspect ?? 1.6), contentMode: .fit)
+                .frame(maxHeight: 260)
                 .background(SKWell { Color.clear })
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 .padding(.horizontal, 14)
             ScrollView { upcoming(walk).padding(.horizontal, 14).padding(.vertical, 4) }
             TripBar(title: tripTitle, systemImage: trip == nil ? "cart" : "checkmark", action: toggleTrip) {
@@ -130,11 +133,13 @@ struct WalkMap {
         let label: String
     }
 
+    /// One pin per zone with something left: its first walk number, and how many things are there.
     struct Pin: Identifiable {
         let number: Int
+        let count: Int
         let zone: Int
         let isNext: Bool
-        var id: Int { number }
+        var id: Int { zone }
     }
 
     let blocks: [Block]
@@ -154,7 +159,8 @@ struct WalkMap {
             guard let zone else { return nil }
             return names.firstIndex { ItemName.normalized($0) == ItemName.normalized(zone) }
         }
-        if let plan = DefaultZones.plan(forZones: names)?.upright {
+        // The plan as drawn, wide, to fill the card across the phone.
+        if let plan = DefaultZones.plan(forZones: names) {
             blocks = plan.blocks.map { Block(rect: $0.rect, zone: index(of: $0.zone), label: $0.label) }
             aspect = plan.aspect
             entrance = CGPoint(x: plan.entranceX, y: plan.entranceY)
@@ -175,13 +181,19 @@ struct WalkMap {
         }
         self.states = states
         let nextNumber = walk.next?.number
-        pins = walk.walkStops.flatMap { stop -> [Pin] in
-            guard case .zone(let zone) = stop.kind else { return [] }
-            return zip(stop.entries, stop.numbers).compactMap { row, number in
-                guard let number, !row.isChecked else { return nil }
-                return Pin(number: number, zone: zone, isNext: number == nextNumber)
+        var left: [Int: [Int]] = [:]
+        for stop in walk.walkStops {
+            guard case .zone(let zone) = stop.kind else { continue }
+            for (row, number) in zip(stop.entries, stop.numbers) where !row.isChecked {
+                if let number { left[zone, default: []].append(number) }
             }
         }
+        pins = left.compactMap { zone, numbers in
+            guard let first = numbers.min() else { return nil }
+            return Pin(number: first, count: numbers.count, zone: zone,
+                       isNext: nextNumber.map { numbers.contains($0) } ?? false)
+        }
+        .sorted { $0.number < $1.number }
         // The walk so far: every stop done before the next one, in order.
         var walked: [Int] = []
         if inStore {
@@ -194,9 +206,9 @@ struct WalkMap {
         self.inStore = inStore
     }
 
-    /// The zones in walking order as a grid, three across, snaking up from the door at the bottom left.
+    /// The zones in walking order as a grid, four across, snaking up from the door at the bottom left.
     static func layout(_ names: [String]) -> [Block] {
-        let columns = 3
+        let columns = 4
         let rows = max(1, Int((Double(names.count) / Double(columns)).rounded(.up)))
         let gap = 0.025
         let width = (1 - gap * Double(columns + 1)) / Double(columns)
@@ -227,9 +239,10 @@ struct WalkMapView: View {
             let size = geo.size
             ZStack(alignment: .topLeading) {
                 Canvas { context, _ in draw(&context, size: size) }
-                ForEach(placedPins(size)) { placed in
-                    WalkBadge(number: placed.pin.number, isNext: placed.pin.isNext)
-                        .position(placed.point)
+                ForEach(map.pins) { pin in
+                    if let point = center(of: pin.zone, size) {
+                        ZonePin(pin: pin).position(x: point.x, y: point.y - 4)
+                    }
                 }
                 if map.inStore {
                     youDot.position(you(size))
@@ -243,7 +256,8 @@ struct WalkMapView: View {
 
     private var accessibilityText: String {
         let next = map.pins.first(where: \.isNext).map { "Next is stop \($0.number)." } ?? ""
-        return "Store map. \(map.pins.count) things to get. \(next)"
+        let left = map.pins.reduce(0) { $0 + $1.count }
+        return "Store map. \(left) things to get in \(map.pins.count) zones. \(next)"
     }
 
     private var youDot: some View {
@@ -270,31 +284,6 @@ struct WalkMapView: View {
     /// Where you are: the last zone done, or the door.
     private func you(_ size: CGSize) -> CGPoint {
         map.walked.last.flatMap { center(of: $0, size) } ?? door(size)
-    }
-
-    private struct PlacedPin: Identifiable {
-        let pin: WalkMap.Pin
-        let point: CGPoint
-        var id: Int { pin.id }
-    }
-
-    /// Each zone's pins in rows across its biggest block, 22 pt apart.
-    private func placedPins(_ size: CGSize) -> [PlacedPin] {
-        Dictionary(grouping: map.pins, by: \.zone).flatMap { zone, pins -> [PlacedPin] in
-            guard let anchor = map.anchor(of: zone) else { return [] }
-            let r = rect(anchor, size)
-            let step: CGFloat = 22
-            let perRow = max(1, Int(r.width / step))
-            let rows = (pins.count + perRow - 1) / perRow
-            return pins.sorted { $0.number < $1.number }.enumerated().map { index, pin in
-                let row = index / perRow
-                let inRow = min(perRow, pins.count - row * perRow)
-                let column = index % perRow
-                let x = r.midX + (CGFloat(column) - CGFloat(inRow - 1) / 2) * step
-                let y = r.midY + (CGFloat(row) - CGFloat(rows - 1) / 2) * step
-                return PlacedPin(pin: pin, point: CGPoint(x: x, y: y))
-            }
-        }
     }
 
     private func draw(_ context: inout GraphicsContext, size: CGSize) {
@@ -336,5 +325,28 @@ struct WalkMapView: View {
         }
         let doorPoint = door(size)
         context.fill(Path(CGRect(x: doorPoint.x - 5, y: doorPoint.y - 5, width: 10, height: 10)), with: .color(ink))
+    }
+}
+
+/// A zone's pin on the map: its first walk number, with how many things are there when it's more than one.
+private struct ZonePin: View {
+    let pin: WalkMap.Pin
+
+    var body: some View {
+        WalkBadge(number: pin.number, isNext: pin.isNext)
+            .overlay(alignment: .topTrailing) {
+                if pin.count > 1 {
+                    Text("\(pin.count)")
+                        .font(.system(size: 9, weight: .heavy))
+                        .monospacedDigit()
+                        .foregroundStyle(pin.isNext ? Hybrid.orange : Hybrid.blueFill)
+                        .padding(.horizontal, 3)
+                        .frame(minWidth: 14, minHeight: 14)
+                        .background(Capsule().fill(.white))
+                        .overlay(Capsule().stroke(pin.isNext ? Hybrid.orange : Hybrid.blueFill, lineWidth: 1))
+                        .offset(x: 8, y: -6)
+                }
+            }
+            .accessibilityHidden(true)
     }
 }

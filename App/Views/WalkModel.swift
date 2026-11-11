@@ -48,14 +48,25 @@ struct WalkModel {
     /// The stop the next item is at.
     var nextStop: Walk.Stop<ListRow>? { stops.first { $0.state == .next } }
 
-    /// The LCD's strip in the store: a cell per stop, full once done, half for the next one.
+    /// The LCD's strip in the store: a cell per stop, full once done, half for the next one. A long walk shares out
+    /// its stops over at most `maxCells` cells, so the strip stays readable: a cell is full once all its stops are done.
     var strip: [StripCell] {
-        walkStops.map { stop in
-            switch stop.state {
-            case .done: return StripCell(fill: .full)
-            case .next: return StripCell(fill: .half, marked: true)
-            case .ahead: return StripCell(fill: .empty)
-            }
+        let states = walkStops.map(\.state)
+        let maxCells = 14
+        guard states.count > maxCells else { return states.map(Self.cell) }
+        return (0..<maxCells).map { cell in
+            let start = cell * states.count / maxCells, end = (cell + 1) * states.count / maxCells
+            let part = states[start..<end]
+            if part.contains(.next) { return Self.cell(.next) }
+            return Self.cell(part.allSatisfy { $0 == .done } ? .done : .ahead)
+        }
+    }
+
+    private static func cell(_ state: Walk.StopState) -> StripCell {
+        switch state {
+        case .done: return StripCell(fill: .full)
+        case .next: return StripCell(fill: .half, marked: true)
+        case .ahead: return StripCell(fill: .empty)
         }
     }
 
