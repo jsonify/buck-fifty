@@ -162,7 +162,7 @@ public enum Milestones {
                       does: "The map key shows where everything is, coloured by zone, with your last walk.",
                       howTo: facts.mapsStore
                         ? "Tap Start trip at the door and keep the app open while you shop."
-                        : "Turn on Map the store in Settings, then tap Start trip at the door.",
+                        : "Turn on Map the store on the You tab, then tap Start trip at the door.",
                       guidePart: "map", progress: facts.mappedTrips, target: mapTrips, unit: "mapped trip",
                       blockedBy: facts.mapsStore || facts.mappedTrips > 0 ? nil : "Map the store is off"),
             Milestone(id: "guess", kind: .earned, title: "Guesses zones", systemImage: "sparkles",
@@ -190,7 +190,7 @@ public enum Milestones {
                   howTo: "Tap the share key on a list and send the invitation.", guidePart: "sharing"),
             tryIt(Try.map, facts, title: "Map the store", systemImage: "location.north.line", done: facts.mapsStore,
                   does: "Experimental: your steps and the compass trace your walk into a floor plan.",
-                  howTo: "Turn on Map the store in Settings.", guidePart: "map"),
+                  howTo: "Turn on Map the store on the You tab.", guidePart: "map"),
         ]
     }
 

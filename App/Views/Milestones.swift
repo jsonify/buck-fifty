@@ -6,9 +6,9 @@ import ShoppingCore
 import ShoppingStore
 
 // Milestones (issue #23): what Buck Fifty has learned about a store, what's coming and how soon, and features to try.
-// The home screen shows them one of two ways, chosen in Settings: a Coming up checklist, or a level that rises as
+// The home screen shows them one of two ways, chosen on the You tab: a Coming up checklist, or a level that rises as
 // they're done. Either way, a feature that just switched on is announced once at the top of home, and Milestones (from
-// home or Settings) lists them all.
+// home or the You tab) lists them all.
 
 /// A store's milestones, with what only the app knows: Map the store, whether the list is shared, what's been tried.
 @MainActor

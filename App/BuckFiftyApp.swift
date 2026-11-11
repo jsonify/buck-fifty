@@ -23,34 +23,56 @@ struct RootView: View {
     @Environment(SharingModel.self) private var sharing
     @Environment(Profile.self) private var profile
     @FetchRequest(fetchRequest: Fetch.stores()) private var stores: FetchedResults<Store>
-    @State private var path: [ListRoute] = []
+    // Fetched so the tab bar's Restock count and the store you're in follow every change, here or on the other phone.
+    @FetchRequest(fetchRequest: Fetch.entries()) private var entries: FetchedResults<ListEntry>
+    @FetchRequest(fetchRequest: Fetch.trips()) private var trips: FetchedResults<Trip>
+    @State private var navigator = Navigator()
+    @State private var showingNewStore = false
     /// The tour, on first launch.
     @State private var showingTour = false
-    /// The guide (only opened from here by the screenshot demo; Settings opens it otherwise).
+    /// The guide (only opened from here by the screenshot demo; You opens it otherwise).
     @State private var showingGuide = false
 
     /// Posted when another device's changes (or a newly accepted share) are merged in.
     private let remoteChanges = NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)
         .receive(on: RunLoop.main)
 
+    /// The store every tab is about: the one chosen, else the one you're in, else the first.
+    private var store: Store? {
+        if let chosen = stores.first(where: { $0.id?.uuidString == navigator.storeID }) { return chosen }
+        let mine = trips.first { $0.endedAt == nil && $0.shopperID == profile.id }?.store
+        return mine ?? stores.first
+    }
+
     var body: some View {
-        NavigationStack(path: $path) {
-            StoresView(path: $path)
-                .navigationDestination(for: ListRoute.self) { ListScreen(store: $0.store, mode: $0.mode) }
+        VStack(spacing: 0) {
+            Group {
+                if let store {
+                    screen(for: store)
+                } else {
+                    NoStoreScreen { showingNewStore = true }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            AppTabBar(selection: $navigator.tab, badges: store.map { [.restock: dueCount(at: $0)] } ?? [:])
         }
+        .sk1Chassis()
+        .environment(navigator)
+        .sheet(isPresented: $navigator.choosingStore) {
+            StoreChooserSheet(current: store) { showingNewStore = true }
+                .environment(navigator)
+        }
+        .sheet(isPresented: $showingNewStore) { NewStoreSheet { navigator.choose($0) } }
         .onAppear {
             sharing.refresh(Array(stores))
             if Launch.isDemo {
                 showingTour = Launch.demoScreen == "tour"
                 showingGuide = Launch.demoScreen == "guide"
+                navigator.storeID = stores.first?.id?.uuidString ?? ""
+                navigator.tab = Launch.demoTab
             } else if !profile.hasSeenTour {
                 showingTour = true
             }
-            // The screenshot demo opens straight onto the Costco list, except for the home screen and what opens from
-            // it.
-            guard Launch.isDemo, !Launch.homeScreens.contains(Launch.demoScreen), path.isEmpty,
-                  let costco = stores.first else { return }
-            path = [ListRoute(store: costco, mode: Launch.demoScreen == "restock" ? .restock : .list)]
         }
         .fullScreenCover(isPresented: $showingTour) { TourSheet() }
         .sheet(isPresented: $showingGuide) { GuideSheet() }
@@ -63,16 +85,19 @@ struct RootView: View {
             Text(sharing.errorMessage ?? "")
         }
     }
-}
 
-/// Which list to open, and how: the list itself, or its restock checklist.
-struct ListRoute: Hashable {
-    let store: Store
-    var mode: ListMode = .list
-}
+    /// Each tab gets its own view per store, so its fetches and state start fresh when the store changes.
+    @ViewBuilder private func screen(for store: Store) -> some View {
+        switch navigator.tab {
+        case .home: HomeScreen(store: store).id(store.objectID)
+        case .list: ListScreen(store: store).id(store.objectID)
+        case .map: MapScreen(store: store).id(store.objectID)
+        case .restock: RestockScreen(store: store).id(store.objectID)
+        case .you: YouScreen(store: store)
+        }
+    }
 
-/// The two views of a store's list: what's on it, and the restock checklist of everything the store remembers.
-enum ListMode: Hashable {
-    case list
-    case restock
+    private func dueCount(at store: Store) -> Int {
+        ListService(context: context).neededNotOnList(in: store).count
+    }
 }

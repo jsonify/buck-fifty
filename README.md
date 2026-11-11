@@ -13,28 +13,36 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
 
 - **The tour and the guide.** On first launch a tour walks through every part of the app, a page each with a
   picture of it made from the real parts: it asks your name first and starts your first store at the end.
-  **Settings** (with your name and Map the store) opens it again, or the guide: every part, how it works and every
+  The **You** tab (with your name and Map the store) opens it again, or the guide: every part, how it works and every
   key, with contents to jump around. Both come from `Guide.parts` (`App/Views/Guide.swift`).
 - **Milestones (#23).** Some of the app only switches on after a few trips, so Milestones shows, for each store, what
   it has learned, what's next and how soon (the walk after one trip, the next-trip day after two, Look for it after
   three, the floor plan after ten mapped trips…), and features to try (Restock, dragging an item, a zone layout,
   sharing…). Home announces each once as it switches on, and shows what's coming as a **Checklist** (the next three,
-  with progress) or as **Levels** (New in town to Knows the store), chosen in Settings. The logic is
+  with progress) or as **Levels** (New in town to Knows the store), chosen on the You tab. The logic is
   `ShoppingCore/Milestones.swift`; the targets are the features' own thresholds.
-- **Home: the next trip at a glance.** The LCD names the store you're most likely to shop next (the one you or the
-  other person is in, else the one with the most running low), how much is on its list, and when the next trip
-  probably is. Under it a week strip on the glass shows the days you shopped and NEXT on the day the next trip is due.
-  The tiles go shopping (orange) or straight to Restock. Then everything running low at every store, each with
-  **Add** (or **Add all**), each store with its count, what's low and its next trip, a teal lamp while someone is in
-  it, and the last 30 days in numbers: trips, things bought, the average trip and the last one.
-- **Restock: the checklist for next time.** On a list, the switch under the keys flips between what's on the list and
-  Restock: everything the store remembers, ticked if it's on the list. Each check-off is a purchase with a date, so
+- **Five tabs on shared parts (#25).** Home, List, Map, Restock and You, each about one store (tap its name to
+  switch). Every tab is built from the same parts in `App/Views/Parts.swift`: a store header, the trip LCD (a label,
+  a line, a seven-segment count and a strip of cells), white list cards on the cream chassis, zone headers, walk-number
+  badges, and a trip bar of small keys plus the one orange key. Orange is the next thing, blue is done and the walk,
+  red is Add and LATE.
+- **The list as a walk.** The List tab is the store's list on a rail from the door to the checkout: a stop per zone,
+  each item numbered in the order you'll pick it up. The numbers are worked out as if nothing were checked, so they
+  stay put through a trip (`ShoppingCore/Walk.swift`). The LCD names the next thing to get, its strip a cell per stop.
+- **Map: the same trip on the store.** The Map tab draws the zones (from the store's floor plan when it has one,
+  else in walking order), done zones blue and the next one orange, with the same walk numbers pinned in place, the
+  walk so far dashed from the door, and the next few stops under it.
+- **Home: the next trip at a glance.** The LCD says when the next trip probably is and how much is on the list, over a
+  week strip with the days you shopped and NEXT. Under it: the first few things on the list in store order, cards
+  for what's due before the next trip, each with **Add** (or **Add all**), milestones, and the last 30 days in
+  numbers. **Start trip** goes shopping.
+- **Restock: the checklist for next time.** Its own tab: everything the store remembers, ticked if it's on the list. Each check-off is a purchase with a date, so
   every item has a rhythm (the median days between buying it) and the store has one too (the median days between
   trips, which says when the next trip is). Items that will run out before the next trip come first (**Before the
   next trip**, chipped DUE, or LATE when half a rhythm past due), then **Running low soon** (due the trip after
   next), then **Staples** (bought on half the trips or more since the first time), then **Now and then**. Tap to tick
-  one onto the list, or **Add N due** for all of them; at home the list itself starts with a strip of keys for what's
-  running low. Purchases and trips count by day, so two people splitting up in the store count once. The logic is
+  one onto the list, or **Add N due** for all of them; at home the list itself starts with a strip of what's running
+  low. Purchases and trips count by day, so two people splitting up in the store count once. The logic is
   `Restock` in `ShoppingCore`; `ListService.restockLines(in:)` feeds it the check-offs.
 - **Lists per store.** A new store called Costco starts with zones in walking order: entrance electronics, center
   tables, paper goods, pantry aisles, meat, the back cooler wall, frozen, bakery, then the rotisserie corner by the

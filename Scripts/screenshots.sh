@@ -36,8 +36,8 @@ xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --ba
 
 for appearance in light dark; do
   xcrun simctl ui "$udid" appearance "$appearance"
-  for screen in stores stores-checklist stores-levels list restock add trip edit zone zones map everything tour guide settings \
-      milestones milestones-levels; do
+  for screen in home home-checklist home-levels stores list restock add trip map edit zone zones floorplan everything \
+      you tour guide milestones milestones-levels; do
     xcrun simctl terminate "$udid" "$bundle" 2>/dev/null || true
     xcrun simctl launch "$udid" "$bundle" -demo -demoScreen "$screen" >/dev/null
     sleep 4
