@@ -235,6 +235,9 @@ The Mac has to stay on, awake and logged in. One-time setup, in Terminal on that
 If a job can't find `xcodegen` or `brew`, the service has an older `PATH`: `cd ~/actions-runner && echo "$PATH" > .path
 && ./svc.sh stop && ./svc.sh start`. Logs are in `~/Library/Logs/actions.runner.*`.
 
+To run another repository's jobs on the same Mac, `Scripts/mac-runner.sh add OWNER/REPO` registers a runner for it
+(see [docs/mac-runners.md](docs/mac-runners.md)).
+
 On the Mac, the TestFlight job imports the distribution certificate into a throwaway keychain, signs by its SHA-1 (so
 another "Apple Distribution" identity in your login keychain doesn't clash), and removes that keychain from the search
 list and deletes it afterwards. Its App Store profiles land in `~/Library/MobileDevice/Provisioning Profiles`. The
