@@ -75,6 +75,9 @@ enum Guide {
                     + "where things are in the store.",
                 "Tap a row to check it off. Hold a row to edit its name, zone, spot, how many and a note, or to "
                     + "remove it.",
+                "To take things off the list, tap Remove over the list: every row gets a red button, and tapping it "
+                    + "takes that one off. Tap Remove again when you're done. Something you take off stays in Past "
+                    + "items, and Undo, under the list for a few seconds, puts it back.",
                 "Every row in the walk has a number: the order you'll pick it up. The numbers stay put as you check "
                     + "things off, so 7 is still 7 at the end of the trip. The next one is orange; done stops turn "
                     + "blue on the rail.",
@@ -95,6 +98,9 @@ enum Guide {
             keys: [
                 GuideKey(systemImage: "clock.arrow.circlepath", name: "Past items",
                          does: "Everything you've bought here before, to tap onto the list."),
+                GuideKey(systemImage: "minus.circle", name: "Remove",
+                         does: "Puts a red remove button on every row of the list; tap it again to stop. Undo puts "
+                             + "back what you just took off."),
                 GuideKey(systemImage: "square.stack.3d.up", name: "Zones",
                          does: "The store's zones in walking order, to reorder, add, delete or start from a layout."),
                 GuideKey(systemImage: "tray.full", name: "Everything",

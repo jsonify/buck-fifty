@@ -50,6 +50,41 @@ final class ListServiceTests: XCTestCase {
         XCTAssertNil(service.addToList("   ", store: store, by: jason))
     }
 
+    func testRemovingKeepsTheItemAndUndoPutsItBack() throws {
+        let store = try makeCostco()
+        service.addToList("Eggs", store: store, by: jason)
+        let milk = try XCTUnwrap(service.addToList("Milk", store: store, by: partner))
+        milk.quantity = 3
+        milk.note = "The big one"
+        let place = milk.homePlace
+        try service.save()
+
+        let removed = try XCTUnwrap(service.remove(milk))
+        try service.save()
+        XCTAssertEqual(removed.name, "Milk")
+        XCTAssertEqual(store.entries.map(\.displayName), ["Eggs"])
+        XCTAssertEqual(store.items?.count, 2, "The item stays remembered for Past items")
+
+        let back = try XCTUnwrap(service.restore(removed))
+        try service.save()
+        XCTAssertEqual(back.displayName, "Milk")
+        XCTAssertEqual(back.quantity, 3)
+        XCTAssertEqual(back.note, "The big one")
+        XCTAssertEqual(back.homePlace, place)
+        XCTAssertEqual(back.addedByName, "Sam")
+        XCTAssertEqual(store.entries.count, 2)
+    }
+
+    func testUndoAfterAddingAgainMergesTheCount() throws {
+        let store = try makeCostco()
+        let milk = try XCTUnwrap(service.addToList("Milk", store: store, by: jason))
+        let removed = try XCTUnwrap(service.remove(milk))
+        let again = try XCTUnwrap(service.addToList("Milk", store: store, by: jason))
+        XCTAssertEqual(service.restore(removed), again)
+        XCTAssertEqual(again.quantity, 2)
+        XCTAssertEqual(store.entries.count, 1)
+    }
+
     func testRememberedItemKeepsItsZone() throws {
         let store = try makeCostco()
         let entry = try XCTUnwrap(service.addToList("Rotisserie chicken", store: store, by: jason))
