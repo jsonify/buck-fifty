@@ -69,12 +69,12 @@ struct EverythingSheet: View {
     // MARK: What the trip didn't get
 
     /// What's still on the list after Done. It stays for the next list unless you drop it; the store remembers it
-    /// either way, in Past items.
+    /// either way, in the inventory.
     @ViewBuilder private var leftovers: some View {
         let left = HomeOrder.sorted(entries.filter { !$0.isChecked })
         if !left.isEmpty {
             SKGroup(caption: "Didn't get · \(left.count)",
-                    note: "These stay on the list for your next trip. Drop takes one off; it's still in Past items.") {
+                    note: "These stay on the list for your next trip. Drop takes one off; it's still in the inventory.") {
                 ForEach(left, id: \.objectID) { entry in
                     SKRow(title: entry.displayName,
                           subtitle: entry.item?.storeZone?.displayName ?? ListOrdering.unzonedTitle) {

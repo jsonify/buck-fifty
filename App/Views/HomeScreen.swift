@@ -5,10 +5,11 @@ import SK1UI
 import ShoppingCore
 import ShoppingStore
 
-/// The Home tab (issue #25): the list first. The add field, then the LCD for the next trip (how much is on the list,
-/// what's due, the week on its strip with NEXT on the day the next trip probably is), the list itself in store order
-/// with its walk numbers, what's due before the next trip as cards with a red Add, then milestones and the last month.
-/// The orange key starts the trip and opens the List.
+/// The Home tab: your most recent store and its list. The add field, then the LCD for the next trip (how much is on
+/// the list, what's due, the week on its strip with NEXT on the day the next trip probably is), the list you're
+/// building (`HomeListEditor`: Select from inventory, reorder, trash), what's due before the next trip as cards with a
+/// red Add, then milestones and the last month. The orange key, Start trip, is for the store: it sorts the list and
+/// opens it on the List tab.
 struct HomeScreen: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
@@ -45,7 +46,7 @@ struct HomeScreen: View {
         let rhythm = service.rhythm(of: store)
         let milestones = MilestoneBoard.milestones(for: store, context: context, profile: profile, sharing: sharing)
         VStack(spacing: 10) {
-            ScreenHeader(storeName: store.displayName, title: trip == nil ? "Next trip" : "On a trip",
+            ScreenHeader(storeName: store.displayName, title: trip == nil ? "Your list" : "On a trip",
                          chooseStore: { navigator.choosingStore = true }) {
                 StorePresencePill(store: store, openTrips: Array(openTrips))
             }
@@ -55,9 +56,9 @@ struct HomeScreen: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         lcd(walk: walk, due: low.count, rhythm: rhythm, now: now)
-                        newMilestones(milestones)
-                        listPreview(walk)
+                        list(walk)
                         dueCards(low, now: now)
+                        newMilestones(milestones)
                         comingUp(milestones).id(Self.comingUpID)
                         lastMonth(now: now)
                     }
@@ -126,37 +127,18 @@ struct HomeScreen: View {
 
     // MARK: The list
 
-    @ViewBuilder private func listPreview(_ walk: WalkModel) -> some View {
-        let shown = walk.stops
-            .flatMap { stop in StopRow.rows(of: stop).map { PreviewRow(stop: stop.title, row: $0) } }
-            .filter { !$0.row.row.isChecked }
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                ZoneHeader(title: "Your list · in store order", count: "")
-                Button("All \(walk.left)") { navigator.tab = .list }
-                    .buttonStyle(.sk1Key(size: .small))
-            }
-            if shown.isEmpty {
-                Text("Nothing on the list. Type above to add something, or tick what's due below.")
+    /// At home, the list you're building. On a trip, where it went: the List tab.
+    @ViewBuilder private func list(_ walk: WalkModel) -> some View {
+        if trip == nil {
+            HomeListEditor(store: store)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                ZoneHeader(title: "You're shopping", count: "\(walk.left) left", state: .next)
+                Text("Your list is sorted for the store on the List tab. Tap Back to the trip to carry on.")
                     .sk1Hint()
                     .fixedSize(horizontal: false, vertical: true)
-            } else {
-                ListCard {
-                    ForEach(Array(shown.prefix(4).enumerated()), id: \.element.row.id) { index, preview in
-                        let entry = preview.row.row.entry
-                        ItemRow(name: entry.displayName, detail: preview.stop, quantity: entry.quantity,
-                                isChecked: false, number: preview.row.number, showsDivider: index > 0,
-                                toggle: { actions.toggle(entry) })
-                    }
-                }
             }
         }
-    }
-
-    /// A row of the list preview, with the title of the stop it's at.
-    private struct PreviewRow {
-        let stop: String
-        let row: StopRow
     }
 
     // MARK: What's due

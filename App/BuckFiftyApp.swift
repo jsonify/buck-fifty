@@ -37,11 +37,13 @@ struct RootView: View {
     private let remoteChanges = NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)
         .receive(on: RunLoop.main)
 
-    /// The store every tab is about: the one chosen, else the one you're in, else the first.
+    /// The store every tab is about: the one chosen, else the one you're in, else the one you shopped most recently,
+    /// else the first.
     private var store: Store? {
         if let chosen = stores.first(where: { $0.id?.uuidString == navigator.storeID }) { return chosen }
         let mine = trips.first { $0.endedAt == nil && $0.shopperID == profile.id }?.store
-        return mine ?? stores.first
+        let recent = trips.first { $0.store != nil }?.store
+        return mine ?? recent ?? stores.first
     }
 
     var body: some View {

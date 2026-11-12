@@ -23,17 +23,16 @@ struct StopRow: Identifiable {
     }
 }
 
-/// The List tab. At home it's a plain list in your own order (`HomeOrder`): type things in one after another, drag
-/// them around, and open Past items to tap on what you've bought before. In the store it becomes the walk (issue
-/// #25): the LCD says what's next and how many are left, with the walk's stops on its strip; each stop hangs off the
-/// route rail in walking order (blue once done, orange for the next one), its items on a white card with their walk
-/// numbers, the same numbers as the pins on the Map. Checked items stay in their zone, struck through. Hold an item
-/// and drag it onto another to move it. A switch over the list shows it A to Z instead (`ListGrouping`).
+/// The List tab. At home it's the list you're building (`HomeListEditor`): Select from inventory, type to add, drag to
+/// reorder, the trash to take something off. No check marks, and nothing starts a trip but Start trip. In the store,
+/// after Start trip, it sorts itself into a card per zone in the order you picked things up last time, and every row
+/// has three buttons, explained over the list: the circle (got it, struck through), Not here (the store didn't have it:
+/// it moves to Not here at the bottom and stays on the list for next time) and the trash (changed your mind). Done
+/// takes what you got off the list; the rest stays for next time.
 struct ListScreen: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.colorScheme) private var scheme
     @Environment(Profile.self) private var profile
     @Environment(SharingModel.self) private var sharing
     @Environment(Navigator.self) private var navigator
@@ -47,10 +46,6 @@ struct ListScreen: View {
     @State private var showingFloorPlan = false
     /// The Everything screen: the last trip and every remembered item.
     @State private var showingEverything = false
-    /// Everything opened by Done: it starts with what the trip didn't get.
-    @State private var reviewingTrip = false
-    /// Past items: everything bought before, to tap onto the list.
-    @State private var showingPast = false
     @State private var appliedDemo = false
     /// The row a dragged item is over: it will take that row's place.
     @State private var dropTarget: NSManagedObjectID?
@@ -70,9 +65,11 @@ struct ListScreen: View {
     private var share: ShareSummary { sharing.summary(for: store) }
 
     var body: some View {
-        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items))
+        let split = profile.notHere.split(Array(entries)) { $0.id?.uuidString }
+        let walk = WalkModel(entries: trip == nil ? Array(entries) : split.inPlay, zones: Array(zones),
+                             items: Array(items))
         VStack(spacing: 10) {
-            ScreenHeader(storeName: store.displayName, title: "Shopping list",
+            ScreenHeader(storeName: store.displayName, title: trip == nil ? "Shopping list" : "In the store",
                          chooseStore: { navigator.choosingStore = true }) {
                 StorePresencePill(store: store, openTrips: Array(openTrips))
             }
@@ -83,57 +80,43 @@ struct ListScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if !draftIsBlank {
-                        suggestionList.padding(.horizontal, 4)
+                        suggestionList
+                    } else if trip == nil {
+                        HomeListEditor(store: store)
                     } else {
-                        pastItemsKey.padding(.horizontal, 4).padding(.bottom, 12)
-                        if walk.rows.isEmpty {
-                            Text("A clean list. Type above, one thing after another, or open Past items and tap what "
-                                 + "you've bought before.")
-                                .sk1Hint()
-                                .fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 4)
-                        } else {
-                            groupingSwitch.padding(.horizontal, 4).padding(.bottom, 12)
-                        }
-                        if profile.listGrouping == .alphabetical {
-                            if !walk.rows.isEmpty { alphabeticalList(walk).padding(.horizontal, 4) }
-                        } else if trip == nil {
-                            if !walk.rows.isEmpty { homeList(walk).padding(.horizontal, 4) }
-                        } else {
-                            ForEach(walk.stops, id: \.id) { stop in
-                                stopView(stop, walk: walk)
-                            }
-                        }
+                        inStore(walk, notHere: split.notHere)
                     }
                 }
-                .padding(.leading, 10)
-                .padding(.trailing, 14)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 4)
             }
             .scrollDismissesKeyboard(.interactively)
-            TripBar(title: tripTitle, systemImage: trip == nil ? "cart" : "checkmark", action: toggleTrip) {
-                Button { showingZones = true } label: { Image(systemName: "square.stack.3d.up") }
-                    .buttonStyle(.sk1Key())
-                    .accessibilityLabel("Zones")
-                Button { showingEverything = true } label: { Image(systemName: "tray.full") }
-                    .buttonStyle(.sk1Key())
-                    .accessibilityLabel("Everything: the last trip and every item this store remembers")
-                if profile.mapsStore {
-                    Button { showingFloorPlan = true } label: { Image(systemName: "point.topleft.down.to.point.bottomright.curvepath") }
-                        .buttonStyle(.sk1Key(isOn: mapper.isRecording(trip)))
-                        .accessibilityLabel(mapper.isRecording(trip) ? "Floor plan, mapping this trip" : "Floor plan")
+            if trip == nil {
+                TripBar(title: "Start trip", systemImage: "cart", action: startTrip) {
+                    Button { showingZones = true } label: { Image(systemName: "square.stack.3d.up") }
+                        .buttonStyle(.sk1Key())
+                        .accessibilityLabel("Zones")
+                    Button { showingEverything = true } label: { Image(systemName: "tray.full") }
+                        .buttonStyle(.sk1Key())
+                        .accessibilityLabel("Everything: the last trip and every item this store remembers")
+                    if profile.mapsStore {
+                        Button { showingFloorPlan = true } label: {
+                            Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                        }
+                        .buttonStyle(.sk1Key())
+                        .accessibilityLabel("Floor plan")
+                    }
+                    ShareKey(store: store)
                 }
-                ShareKey(store: store)
+            } else {
+                TripBar(title: doneTitle, systemImage: "checkmark", action: finishTrip) { EmptyView() }
             }
         }
         .padding(.top, 4)
         .sheet(item: $editing) { EditEntrySheet(entry: $0.entry, zones: Array(zones)) }
         .sheet(isPresented: $showingZones) { ZonesSheet(store: store) }
         .sheet(isPresented: $showingFloorPlan) { FloorPlanSheet(store: store) }
-        .sheet(isPresented: $showingEverything, onDismiss: { reviewingTrip = false }) {
-            EverythingSheet(store: store, showsLeftovers: reviewingTrip)
-        }
-        .sheet(isPresented: $showingPast) { PastItemsSheet(store: store) }
+        .sheet(isPresented: $showingEverything) { EverythingSheet(store: store) }
         .onAppear {
             actions.endLapsedTrips()
             ZoneGuessing.guessMissing(in: store, context: context)
@@ -144,152 +127,89 @@ struct ListScreen: View {
         }
     }
 
-    private var tripTitle: String {
-        guard trip != nil else { return "Start trip" }
-        let inCart = entries.filter { $0.isChecked && $0.checkedByID == profile.id }.count
-        return "Done · \(inCart) in cart"
+    private var doneTitle: String {
+        let got = entries.filter { $0.isChecked && $0.checkedByID == profile.id }.count
+        return "Done · \(got) got"
     }
 
-    // MARK: The walk
+    // MARK: In the store
 
-    /// One stop: its node on the rail (and the rail on down to the next), its heading and its card.
-    private func stopView(_ stop: Walk.Stop<ListRow>, walk: WalkModel) -> some View {
-        let p = SK1.palette(for: scheme)
-        let nextID = walk.next?.entry.entry.objectID
-        return HStack(alignment: .top, spacing: 8) {
-            VStack(spacing: 2) {
-                RailNode(text: WalkModel.railLabel(stop), state: stop.state)
-                Rectangle()
-                    .fill(stop.state == .done ? Hybrid.blueFill : Color(sk1Hex: p.inkSoft).opacity(0.3))
-                    .frame(width: 3)
-                    .frame(maxHeight: .infinity)
+    /// The trip: what the buttons do, a card per zone in walking order, then Not here.
+    @ViewBuilder private func inStore(_ walk: WalkModel, notHere: [ListEntry]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("\(Image(systemName: "circle")) Got it  ·  Not here: keep it for next time  ·  \(Image(systemName: "trash")) Don't want it")
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
+            if walk.rows.isEmpty && notHere.isEmpty {
+                Text("Nothing on the list. Type above to add something.")
+                    .sk1Hint()
             }
-            .frame(width: 26)
-            VStack(alignment: .leading, spacing: 6) {
-                ZoneHeader(title: stopTitle(stop), count: stop.left == 0 ? "All in" : "\(stop.left) left",
-                           state: stop.state)
-                ListCard {
-                    ForEach(StopRow.rows(of: stop)) { item in
-                        walkRow(item, isNext: item.id == nextID)
+            ForEach(walk.stops, id: \.id) { stop in
+                zoneCard(stop)
+            }
+            if !notHere.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    ZoneHeader(title: "Not here · next time", count: "\(notHere.count)", state: .done)
+                    ListCard {
+                        ForEach(Array(notHere.enumerated()), id: \.element.objectID) { index, entry in
+                            ItemRow(name: entry.displayName, detail: entry.note, quantity: entry.quantity,
+                                    isChecked: false, showsDivider: index > 0,
+                                    accessory: AnyView(trashKey(entry)), toggle: { actions.toggle(entry) })
+                        }
                     }
-                }
-                if stop.kind == .lookForIt {
-                    Text("These move around the store, so they're not in the walk. Keep an eye out for them.")
+                    Text("These stay on your list for the next trip. Found one after all? Tap its circle.")
                         .sk1Hint()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.bottom, 14)
         }
     }
 
-    private func stopTitle(_ stop: Walk.Stop<ListRow>) -> String {
-        stop.state == .next && trip != nil ? "\(stop.title) · next" : stop.title
-    }
-
-    /// The switch over the list: your own order at home (a stop per zone in walking order in the store), or
-    /// everything A to Z.
-    private var groupingSwitch: some View {
-        let grouping = Binding(get: { profile.listGrouping }, set: { profile.listGrouping = $0 })
-        let first = trip == nil
-            ? SKSegmented<ListGrouping>.Option(.zone, "My order", help: "The order you put it in; drag to move")
-            : SKSegmented<ListGrouping>.Option(.zone, "By zone", help: "A stop per zone, in walking order")
-        return SKSegmented(selection: grouping, options: [
-            first,
-            SKSegmented<ListGrouping>.Option(.alphabetical, "A to Z", help: "Everything on one card, by name"),
-        ], height: 30)
-    }
-
-    /// The list A to Z on one card: no rail and no walk numbers, each row saying its zone. Checked items stay in
-    /// place, struck through.
-    private func alphabeticalList(_ walk: WalkModel) -> some View {
-        let rows = ListOrdering.alphabetical(walk.rows)
-        return VStack(alignment: .leading, spacing: 6) {
-            ZoneHeader(title: "A to Z", count: walk.left == 0 ? "All in" : "\(walk.left) left",
-                       state: walk.left == 0 ? .done : .ahead)
+    /// One zone: its heading and how many are left, and its card. Items keep their place once got, struck through.
+    private func zoneCard(_ stop: Walk.Stop<ListRow>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZoneHeader(title: stop.state == .next ? "\(stop.title) · next" : stop.title,
+                       count: stop.left == 0 ? "All got" : "\(stop.left) left", state: stop.state)
             ListCard {
-                ForEach(Array(rows.enumerated()), id: \.element.entry.objectID) { index, row in
-                    itemRow(row, number: nil, index: index, isNext: false, showsZone: true)
+                ForEach(Array(stop.entries.enumerated()), id: \.element.entry.objectID) { index, row in
+                    tripRow(row, index: index)
+                        .modifier(DragToMove(entry: row.entry, target: $dropTarget) { move($0, onto: row.entry) })
                 }
+            }
+            if stop.kind == .lookForIt {
+                Text("These move around the store, so they're not in a zone. Keep an eye out for them.")
+                    .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.bottom, 14)
     }
 
-    /// The list at home: one card in your own order, no rail and no walk numbers. Hold an item and drag it onto
-    /// another to move it there.
-    private func homeList(_ walk: WalkModel) -> some View {
-        let rows = HomeOrder.sorted(walk.rows)
-        return VStack(alignment: .leading, spacing: 6) {
-            ZoneHeader(title: "Your order", count: walk.left == 0 ? "All in" : "\(walk.left) to get",
-                       state: walk.left == 0 ? .done : .ahead)
-            ListCard {
-                ForEach(Array(rows.enumerated()), id: \.element.entry.objectID) { index, row in
-                    movable(itemRow(row, number: nil, index: index, isNext: false, showsZone: false),
-                            entry: row.entry) { moveAtHome($0, onto: row.entry) }
-                }
-            }
-            Text("In the store it sorts itself into the order you walk it.")
-                .sk1Hint()
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.bottom, 14)
-    }
-
-    /// A row of the walk: it can be dragged onto another to move it in the walk.
-    private func walkRow(_ item: StopRow, isNext: Bool) -> some View {
-        let entry = item.row.entry
-        return movable(itemRow(item.row, number: item.number, index: item.index, isNext: isNext, showsZone: false),
-                       entry: entry) { move($0, onto: entry) }
-    }
-
-    /// `row`, which can be held and dragged onto another row (`drop` gets the dragged entry's id), outlined in orange
-    /// while something is over it.
-    private func movable<Row: View>(_ row: Row, entry: ListEntry,
-                                    drop: @escaping (String?) -> Bool) -> some View {
-        row
-            .draggable(entry.id?.uuidString ?? "") { SKChip(entry.displayName) }
-            .dropDestination(for: String.self) { ids, _ in
-                drop(ids.first)
-            } isTargeted: { over in
-                if over {
-                    dropTarget = entry.objectID
-                } else if dropTarget == entry.objectID {
-                    dropTarget = nil
-                }
-            }
-            .overlay {
-                if dropTarget == entry.objectID {
-                    RoundedRectangle(cornerRadius: 6).stroke(Hybrid.orange, lineWidth: 2)
-                }
-            }
-    }
-
-    /// An item: tap to check it off, hold to edit or remove it. With `showsZone` (A to Z) its detail starts with its
-    /// zone.
-    private func itemRow(_ row: ListRow, number: Int?, index: Int, isNext: Bool, showsZone: Bool) -> some View {
+    /// A row in the store: the circle (got it), Not here and the trash. Hold it to edit it.
+    private func tripRow(_ row: ListRow, index: Int) -> some View {
         let entry = row.entry
-        let guessed = entry.item?.isZoneGuessed == true && !entry.isChecked
-        let lookFor = self.lookFor(row)
-        let zone = showsZone && lookFor == nil ? entry.item?.storeZone?.displayName ?? ListOrdering.unzonedTitle : nil
-        return ItemRow(name: entry.displayName, detail: detail(entry, lookFor: lookFor, zone: zone),
-                       detailTone: lookFor != nil ? .alert : .soft, quantity: entry.quantity,
-                       isChecked: entry.isChecked, number: number, isNext: isNext,
-                       showsDivider: index > 0,
-                       accessory: guessed ? AnyView(guessedChip(entry)) : nil,
+        let keys = HStack(spacing: 6) {
+            if !entry.isChecked {
+                Button("Not here") { actions.markNotHere(entry) }
+                    .buttonStyle(.sk1Key(size: .small))
+                    .accessibilityLabel("\(entry.displayName) isn't here")
+                    .accessibilityHint("Keeps it on the list for next time")
+                trashKey(entry)
+            }
+        }
+        return ItemRow(name: entry.displayName, detail: detail(entry, lookFor: lookFor(row)),
+                       detailTone: lookFor(row) != nil ? .alert : .soft, quantity: entry.quantity,
+                       isChecked: entry.isChecked, showsDivider: index > 0, accessory: AnyView(keys),
                        toggle: { actions.toggle(entry) })
-            .onTapGesture { actions.toggle(entry) }
             .contextMenu {
                 Button("Edit", systemImage: "pencil") { editing = Editing(entry: entry) }
-                Button("Remove from list", systemImage: "trash", role: .destructive) { remove(entry) }
             }
             .accessibilityAction(named: "Edit") { editing = Editing(entry: entry) }
     }
 
-    private func guessedChip(_ entry: ListEntry) -> some View {
-        Button { editing = Editing(entry: entry) } label: { SKChip("GUESSED", minWidth: 64) }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Zone guessed: \(entry.item?.storeZone?.displayName ?? ""). Edit")
+    private func trashKey(_ entry: ListEntry) -> some View {
+        Button { actions.remove(entry) } label: { Image(systemName: "trash") }
+            .buttonStyle(.sk1Key(size: .small))
+            .accessibilityLabel("Take \(entry.displayName) off the list")
     }
 
     /// Where an item under Look for it has been seen, or nil for every other row.
@@ -300,12 +220,10 @@ struct ListScreen: View {
         return seen
     }
 
-    /// The zone (A to Z only), the note, and on a shared list who added it or has it in their cart when that isn't
-    /// you.
-    private func detail(_ entry: ListEntry, lookFor: String?, zone: String? = nil) -> String? {
+    /// The note, and on a shared list who added it or has it in their cart when that isn't you.
+    private func detail(_ entry: ListEntry, lookFor: String?) -> String? {
         var parts: [String] = []
         if let lookFor { parts.append(lookFor) }
-        if let zone { parts.append(zone) }
         if let note = entry.note, !note.isEmpty { parts.append(note) }
         if share.isShared {
             if entry.isChecked, let id = entry.checkedByID, id != profile.id, let name = entry.checkedByName {
@@ -318,17 +236,6 @@ struct ListScreen: View {
     }
 
     // MARK: Adding
-
-    /// Opens Past items: everything bought before, to tap onto the list. Kept off the list itself, so a new list
-    /// starts clean.
-    private var pastItemsKey: some View {
-        Button { showingPast = true } label: {
-            Label("Past items", systemImage: "clock.arrow.circlepath")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.sk1Key())
-        .accessibilityHint("Everything you've bought before, to tap onto the list")
-    }
 
     private var draftIsBlank: Bool { ItemName.cleaned(draft).isEmpty }
 
@@ -374,7 +281,8 @@ struct ListScreen: View {
     /// neighbours, and `target`'s zone if it has one.
     private func move(_ id: String?, onto target: ListEntry) -> Bool {
         dropTarget = nil
-        let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items))
+        let split = profile.notHere.split(Array(entries)) { $0.id?.uuidString }
+        let walk = WalkModel(entries: split.inPlay, zones: Array(zones), items: Array(items))
         let rows = walk.unchecked
         guard let id, let from = rows.firstIndex(where: { $0.entry.id?.uuidString == id }),
               let to = rows.firstIndex(where: { $0.entry == target }), from != to,
@@ -391,32 +299,13 @@ struct ListScreen: View {
         return true
     }
 
-    /// Moves the dragged entry (by its id) to `target`'s place in your own order, at home.
-    private func moveAtHome(_ id: String?, onto target: ListEntry) -> Bool {
-        dropTarget = nil
-        let list = HomeOrder.sorted(Array(entries))
-        guard let id, let from = list.firstIndex(where: { $0.id?.uuidString == id }),
-              let to = list.firstIndex(of: target), from != to else { return false }
-        service.moveAtHome(list, from: from, to: to)
-        actions.save()
-        profile.markTried(Milestones.Try.drag)
-        return true
+    private func startTrip() {
+        actions.start()
     }
 
-    private func remove(_ entry: ListEntry) {
-        service.remove(entry)
-        actions.save()
-    }
-
-    private func toggleTrip() {
-        if trip == nil {
-            actions.start()
-        } else if actions.finish(trip) {
-            // What you bought comes off the list; the trip's review starts with what you didn't get (to keep for
-            // next time or drop) and is where to set zones and fix the order.
-            reviewingTrip = true
-            showingEverything = true
-        }
+    /// Done: what you got comes off the list; what wasn't here, and anything not checked off, stays for next time.
+    private func finishTrip() {
+        _ = actions.finish(trip)
     }
 
     private func applyDemoScreen() {
@@ -427,7 +316,10 @@ struct ListScreen: View {
         case "zones": showingZones = true
         case "floorplan": showingFloorPlan = true
         case "everything": showingEverything = true
-        case "past": showingPast = true
+        case "trip":
+            if let pesto = entries.first(where: { $0.displayName == "Kirkland pesto" }) {
+                profile.notHere.mark(pesto.id?.uuidString)
+            }
         case "edit", "zone": editing = entries.first { $0.displayName == "Coffee beans" }.map(Editing.init)
         default: break
         }
@@ -483,13 +375,13 @@ extension WalkModel {
         let stopCount = walkStops.count
         if let trip {
             let minutes = Int(now.timeIntervalSince(trip.startedAt ?? now) / 60)
-            let main = next.map { "Next \($0.number) · \($0.entry.entry.displayName)" } ?? "All in · tap Done"
+            let main = next.map { "Next · \($0.entry.entry.displayName)" } ?? "All got · tap Done"
             let middle = nextStop?.title ?? "Checkout"
             return TripLCD(label: "In the store · \(minutes) min", main: main, number: left, unit: "left",
                            strip: strip, legend: ["Entry", middle, "Exit"])
         }
-        let main = left == 0 ? "A clean list" : stopCount == 1 ? "1 stop in the walk" : "\(stopCount) stops in the walk"
+        let main = left == 0 ? "A blank list" : stopCount == 1 ? "1 zone to visit" : "\(stopCount) zones to visit"
         return TripLCD(label: "At home · \(store.displayName)", main: main, number: left, unit: "on list",
-                       strip: strip, legend: ["Entry", "In walking order", "Exit"])
+                       strip: strip, legend: ["Entry", "Sorted at Start trip", "Exit"])
     }
 }

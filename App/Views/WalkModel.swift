@@ -112,6 +112,10 @@ struct TripActions {
     /// Starts a trip at the door: the origin of the map. With trips by location on, the first trip at a store pins
     /// it there. `atDoor` is false for a trip started by walking into the store's circle, which isn't mapped.
     func start(atDoor: Bool = true) {
+        // A new trip looks for everything again, including what the last one didn't find.
+        if service.activeTrip(among: Array(store.trips ?? []), for: profile.shopper) == nil {
+            profile.notHere = NotHereMarks()
+        }
         let started = service.startTrip(at: store, for: profile.shopper)
         if atDoor, profile.mapsStore, StoreMapper.isAvailable, !Launch.isDemo {
             mapper.start(started, gridHeading: store.gridHeading?.doubleValue)
@@ -131,10 +135,24 @@ struct TripActions {
 
     /// Checks an entry off or back on; a check-off on a mapped trip becomes a point on the map.
     func toggle(_ entry: ListEntry) {
+        profile.notHere.unmark(entry.id?.uuidString)
         let checkOff = service.setChecked(entry, !entry.isChecked, by: profile.shopper)
         if let checkOff, let item = entry.item, mapper.isRecording(checkOff.trip) {
             service.setPoint(mapper.mark(checkOff, landmark: service.landmark(of: item)), of: checkOff)
         }
+        save()
+    }
+
+    /// Not here: the store didn't have it this time. It stays on the list for the next trip, under Not here.
+    func markNotHere(_ entry: ListEntry) {
+        if entry.isChecked { toggle(entry) }
+        profile.notHere.mark(entry.id?.uuidString)
+    }
+
+    /// Takes an entry off the list: changed your mind.
+    func remove(_ entry: ListEntry) {
+        profile.notHere.unmark(entry.id?.uuidString)
+        service.remove(entry)
         save()
     }
 

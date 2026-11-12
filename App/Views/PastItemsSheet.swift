@@ -5,10 +5,10 @@ import SK1UI
 import ShoppingCore
 import ShoppingStore
 
-/// Past items: everything the store remembers, opened from the List tab, so a new list can start clean and still be
-/// built in a few taps. Usual (what you buy most, most first), Running low (what Restock says runs out before the next
-/// trip), Last trip, or everything A to Z; the find field narrows it. Tap an item to put it on the list, again to take
-/// it off.
+/// The inventory (Select from inventory, over the list at home): everything the store remembers, so a blank list can
+/// be built in a few taps. Usual (what you buy most, most first), Running low (what Restock says runs out before the
+/// next trip), Last trip, or everything A to Z; the find field narrows it. Tap the things you need to pick them (tap
+/// again to unpick), then Add to list puts them all on the list at once. What's already on the list says so.
 struct PastItemsSheet: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
@@ -18,6 +18,8 @@ struct PastItemsSheet: View {
     @FetchRequest private var entries: FetchedResults<ListEntry>
     @State private var query = ""
     @State private var filter: PastItemsFilter = .usual
+    /// What's picked, to add with Add to list.
+    @State private var picked: Set<NSManagedObjectID> = []
 
     init(store: Store) {
         self.store = store
@@ -34,8 +36,7 @@ struct PastItemsSheet: View {
         let all = service.pastItems(in: store, now: now)
         let shown = PastItems.filtered(all, by: filter, query: query)
         let bought = all.filter { $0.timesBought > 0 }.count
-        let onList = entries.filter { !$0.isChecked }.count
-        SheetScaffold(title: "Past items", detail: "\(bought) BOUGHT BEFORE") {
+        SheetScaffold(title: "Inventory", detail: "\(bought) BOUGHT BEFORE") {
             SKTextField("Find", text: $query, prompt: "Find something you've bought…")
                 .textInputAutocapitalization(.never)
             SKSegmented(selection: $filter, options: [
@@ -49,26 +50,36 @@ struct PastItemsSheet: View {
                     .sk1Hint()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                SKGroup(caption: caption(shown.count), note: "Tap to put it on the list; tap again to take it off.") {
+                SKGroup(caption: caption(shown.count),
+                        note: "Tap everything you need, then Add to list. Tap again to unpick.") {
                     ForEach(shown, id: \.ref.objectID) { past in
-                        Button { toggle(past.ref) } label: {
+                        let isPicked = picked.contains(past.ref.objectID)
+                        Button { pick(past.ref) } label: {
                             SKRow(title: past.name, subtitle: subtitle(past, now: now)) {
-                                SKChip(past.isOnList ? "ON LIST" : "ADD", minWidth: 64)
+                                if past.isOnList {
+                                    SKChip("ON LIST", minWidth: 64)
+                                } else {
+                                    CheckCircle(isOn: isPicked)
+                                }
                             }
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(past.isOnList ? "\(past.name), on the list" : past.name)
-                        .accessibilityHint(past.isOnList ? "Takes it off the list" : "Puts it on the list")
+                        .disabled(past.isOnList)
+                        .accessibilityLabel(past.isOnList ? "\(past.name), already on the list" : past.name)
+                        .accessibilityAddTraits(isPicked ? [.isSelected] : [])
+                        .accessibilityHint(past.isOnList ? "" : isPicked ? "Unpicks it" : "Picks it to add")
                     }
                 }
             }
         } actions: {
-            Text(onList == 1 ? "1 on the list" : "\(onList) on the list")
-                .sk1Hint()
+            Button("Cancel") { dismiss() }.buttonStyle(.sk1Key())
             Spacer()
-            Button("Done") { dismiss() }.buttonStyle(.sk1Key(.orange))
+            Button(picked.isEmpty ? "Add to list" : "Add \(picked.count) to list", action: addPicked)
+                .buttonStyle(.sk1Key(.orange))
+                .disabled(picked.isEmpty)
         }
+        .onAppear(perform: pickForDemo)
     }
 
     private func caption(_ count: Int) -> String {
@@ -96,8 +107,28 @@ struct PastItemsSheet: View {
         return past.isRunningLow ? "Running low · \(summary)" : summary
     }
 
-    private func toggle(_ item: Item) {
-        service.toggleOnList(item, by: profile.shopper)
+    private func pick(_ item: Item) {
+        if picked.contains(item.objectID) {
+            picked.remove(item.objectID)
+        } else {
+            picked.insert(item.objectID)
+        }
+    }
+
+    /// Puts everything picked on the list, at the bottom of your order, and closes.
+    private func addPicked() {
+        for item in items where picked.contains(item.objectID) && !service.isOnList(item) {
+            service.toggleOnList(item, by: profile.shopper)
+        }
         try? service.save()
+        ZoneGuessing.guessMissing(in: store, context: context)
+        dismiss()
+    }
+
+    /// The screenshot demo shows a few things picked.
+    private func pickForDemo() {
+        guard Launch.isDemo, picked.isEmpty else { return }
+        let names: Set<String> = ["Bananas", "Butter", "Sparkling water"]
+        picked = Set(items.filter { names.contains($0.displayName) && !service.isOnList($0) }.map(\.objectID))
     }
 }

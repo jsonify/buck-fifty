@@ -20,7 +20,6 @@ struct MapScreen: View {
     @FetchRequest private var items: FetchedResults<Item>
     @FetchRequest private var openTrips: FetchedResults<Trip>
     @State private var showingFloorPlan = false
-    @State private var showingEverything = false
     @State private var editing: Editing?
 
     init(store: Store) {
@@ -69,7 +68,6 @@ struct MapScreen: View {
         }
         .padding(.top, 4)
         .sheet(isPresented: $showingFloorPlan) { FloorPlanSheet(store: store) }
-        .sheet(isPresented: $showingEverything) { EverythingSheet(store: store) }
         .sheet(item: $editing) { EditEntrySheet(entry: $0.entry, zones: Array(zones)) }
         .onAppear { actions.endLapsedTrips() }
         .onChange(of: scenePhase) { _, phase in
@@ -79,8 +77,8 @@ struct MapScreen: View {
 
     private var tripTitle: String {
         guard trip != nil else { return "Start trip" }
-        let inCart = entries.filter { $0.isChecked && $0.checkedByID == profile.id }.count
-        return "Done · \(inCart) in cart"
+        let got = entries.filter { $0.isChecked && $0.checkedByID == profile.id }.count
+        return "Done · \(got) got"
     }
 
     /// The stops still to do, from the next one on, with the List's headings and rows.
@@ -102,8 +100,8 @@ struct MapScreen: View {
                             let entry = item.row.entry
                             ItemRow(name: entry.displayName, detail: entry.note, quantity: entry.quantity,
                                     isChecked: entry.isChecked, number: item.number, isNext: item.id == nextID,
-                                    showsDivider: item.index > 0, toggle: { actions.toggle(entry) })
-                                .onTapGesture { actions.toggle(entry) }
+                                    showsDivider: item.index > 0,
+                                    toggle: trip == nil ? nil : { actions.toggle(entry) })
                                 .contextMenu {
                                     Button("Edit", systemImage: "pencil") { editing = Editing(entry: entry) }
                                 }
@@ -117,8 +115,9 @@ struct MapScreen: View {
     private func toggleTrip() {
         if trip == nil {
             actions.start()
-        } else if actions.finish(trip) {
-            showingEverything = true
+        } else {
+            // What you got comes off the list; the rest stays for next time.
+            _ = actions.finish(trip)
         }
     }
 }

@@ -26,16 +26,19 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   a line, a seven-segment count and a strip of cells), white list cards on the cream chassis, zone headers, walk-number
   badges, and a trip bar of small keys plus the one orange key. Orange is the next thing, blue is done and the walk,
   red is Add and LATE.
-- **The list as a walk.** The List tab is the store's list on a rail from the door to the checkout: a stop per zone,
-  each item numbered in the order you'll pick it up. The numbers are worked out as if nothing were checked, so they
-  stay put through a trip (`ShoppingCore/Walk.swift`). Each zone is one stop, so it never shows up twice. The LCD
-  names the next thing to get, its strip a cell per stop. A switch over the list shows it A to Z instead: one card by
-  name, each row saying its zone.
+- **Build at home, shop in the store.** At home (Home and the List tab) the list is something you build: **Select
+  from inventory** opens everything you've bought before, you tap all you need and **Add to list** puts them on
+  together. Rows have no check marks there: tap to edit, the trash to remove, drag to reorder. Only **Start trip**, in
+  the store, starts a trip: the list then sorts itself into a card per zone, in the order your trips reach them
+  (`ShoppingCore/Walk.swift`). Each row has three buttons, explained over the list: the circle (got it, struck
+  through), **Not here** (the store didn't have it: it moves to Not here at the bottom and stays on the list for next
+  time; `ShoppingCore/NotHere.swift`, kept on the phone) and the trash. The LCD names the next thing to get.
 - **Map: the same trip on the store.** The Map tab draws the zones (from the store's floor plan when it has one,
   else in walking order), done zones blue and the next one orange, a pin per zone with what's left there (its first walk
   number and a count), the walk so far dashed from the door, and the stops still to do under it.
-- **Home: the next trip at a glance.** The LCD says when the next trip probably is and how much is on the list, over a
-  week strip with the days you shopped and NEXT. Under it: the first few things on the list in store order, cards
+- **Home: your list for the next trip.** It opens on the store you last shopped. The LCD says when the next trip
+  probably is and how much is on the list, over a week strip with the days you shopped and NEXT. Under it: the list
+  you're building, cards
   for what's due before the next trip, each with **Add** (or **Add all**), milestones, and the last 30 days in
   numbers. **Start trip** goes shopping.
 - **Restock: the checklist for next time.** Its own tab: everything the store remembers, ticked if it's on the list. Each check-off is a purchase with a date, so
@@ -67,16 +70,15 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   Everything says why. The row shows a **GUESSED** chip: tap it to fix the zone, or save to keep it. A zone you set by
   hand (even "No zone") is never replaced by a guess, and the guess is saved to the shared list, so only one phone
   guesses. Once you've bought the item, its learned position wins.
-- **Everything: the trip review.** **Done** takes what you bought off the list, and the Everything screen (the tray
-  key) opens by itself: your last trip in the order you checked things off, then every item the store remembers, in
+- **Everything: the trip review.** The Everything screen (the tray key on the List tab at home) shows your last trip in the order you checked things off, then every item the store remembers, in
   walking order under its zone, with where in the walk it's grabbed. Tap one to set its zone, rename it, put it back
   on the list or forget it; hold and drag one onto another to move it in the walk; **Guess zones** asks Apple
   Intelligence for any without a zone.
 - **Drag items into place.** Hold an item and drag it onto another: it takes that one's place in the walk, and its
   zone. The drag sets its learned position, so the next trips start from where you put it rather than snapping back.
-- **Trips.** Checking something off in the store starts a trip, or you tap **Start trip**. Every check-off is saved
+- **Trips.** You tap **Start trip** in the store (or Trips by location starts it as you arrive). Every check-off is saved
   with its time on the trip, so the order you check things off is your route through the store. Unchecking during the trip removes that check-off, so a mis-tap teaches nothing. **Done** ends the trip
-  and clears what you bought; a trip with no check-offs for 45 minutes ends on its own. Each person gets their own
+  and clears what you got (what wasn't there, or wasn't checked off, stays for next time); a trip with no check-offs for 45 minutes ends on its own. Each person gets their own
   trip, so two people splitting up in the store don't mix their routes.
 - **The list learns the store's order.** Your check-offs are the map. When a trip ends, each item you checked off
   gets a sample of where in the trip you grabbed it, by rank: the k-th of n check-offs is at k / (n − 1), from 0
