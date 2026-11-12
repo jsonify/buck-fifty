@@ -9,7 +9,10 @@ on:
 
 jobs:
   conventional:
-    runs-on: ubuntu-latest
+    # On the same Mac as CI, so it doesn't wait for GitHub's runners either; MAC_RUNNER switches both back.
+    runs-on: ${{ fromJSON(vars.MAC_RUNNER || '["self-hosted","macOS"]') }}
+    # A self-hosted runner on a public repo: never run a fork's pull request on it.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v4
         with:
