@@ -56,9 +56,9 @@ struct HomeScreen: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         lcd(walk: walk, due: low.count, rhythm: rhythm, now: now)
-                        newMilestones(milestones)
                         list(walk)
                         dueCards(low, now: now)
+                        newMilestones(milestones)
                         comingUp(milestones).id(Self.comingUpID)
                         lastMonth(now: now)
                     }
