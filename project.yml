@@ -56,6 +56,9 @@ targets:
         CKSharingSupported: true
         # Mapping the store from trips (issue #5, off unless turned on).
         NSMotionUsageDescription: Buck Fifty counts your steps and reads the compass during a trip to map where things are in the store. The map stays on your phone and in your shared list.
+        # Trips by location (off unless turned on): a circle around each pinned store, watched with the app closed.
+        NSLocationWhenInUseUsageDescription: Buck Fifty pins a store where you stand, so a trip can start as you arrive and end as you leave. Your location stays on your phone.
+        NSLocationAlwaysAndWhenInUseUsageDescription: With Always, a trip ends as you leave the store even when Buck Fifty is closed, so one you forgot to end doesn't run on. Your location stays on your phone.
         # Silent pushes when another phone changes a shared list.
         UIBackgroundModes:
           - remote-notification

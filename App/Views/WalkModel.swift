@@ -109,12 +109,14 @@ struct TripActions {
     private var service: ListService { ListService(context: context) }
     private var mapper: StoreMapper { StoreMapper.shared }
 
-    /// Starts a trip at the door: the origin of the map.
-    func start() {
+    /// Starts a trip at the door: the origin of the map. With trips by location on, the first trip at a store pins
+    /// it there. `atDoor` is false for a trip started by walking into the store's circle, which isn't mapped.
+    func start(atDoor: Bool = true) {
         let started = service.startTrip(at: store, for: profile.shopper)
-        if profile.mapsStore, StoreMapper.isAvailable, !Launch.isDemo {
+        if atDoor, profile.mapsStore, StoreMapper.isAvailable, !Launch.isDemo {
             mapper.start(started, gridHeading: store.gridHeading?.doubleValue)
         }
+        if atDoor, !Launch.isDemo { StoreFence.shared.pinIfNeeded(store) }
         save()
     }
 

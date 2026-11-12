@@ -55,7 +55,8 @@ enum Guide {
                 GuideKey(systemImage: "person.badge.plus", name: "Share",
                          does: "Invites someone to this store's list. It stays lit once the list is shared."),
                 GuideKey(systemImage: "person.crop.circle", name: "You",
-                         does: "The last tab: your name, how milestones show, the tour, the guide and Map the store."),
+                         does: "The last tab: your name, how milestones show, the tour, the guide, trips by "
+                             + "location and Map the store."),
             ]),
         GuidePart(
             id: "list", title: "The list", systemImage: "list.bullet",
@@ -104,7 +105,7 @@ enum Guide {
                          does: "Invites someone to the list. It stays lit once the list is shared."),
                 GuideKey(systemImage: "flag.checkered", name: "Start trip / Done",
                          does: "Starts a trip at the door; Done ends it, takes what you bought off the list and asks about "
-                             + "what you didn't get."),
+                             + "what you didn't get. With trips by location on, arriving and leaving tap them for you."),
             ]),
         GuidePart(
             id: "storemap", title: "The Map tab", systemImage: "map.fill",
@@ -217,6 +218,24 @@ enum Guide {
                     + "person is in the store.",
                 "It goes through iCloud: no server, no cost. Changes made offline are sent when you're back online.",
                 "Your name, on the You tab, is what they see.",
+            ]),
+        GuidePart(
+            id: "location", title: "Trips by location", systemImage: "location",
+            summary: "Off until you turn it on, on the You tab: a trip starts as you arrive at the store and ends as "
+                + "you leave, so one you forgot to end doesn't run on.",
+            points: [
+                "Each store is a circle on the map, pinned where you stand when you tap Pin here on the You tab, or "
+                    + "the first time you tap Start trip there with this on.",
+                "Arriving starts a trip if there's something on the list. Leaving the circle ends it, the same as "
+                    + "Done: what you checked off comes off the list. A trip with nothing checked off is forgotten.",
+                "The radius (100, 200 or 400 m) takes in the car park, so the trip ends as you drive away, not at "
+                    + "the door. A big store in a wide car park wants 400.",
+                "It works with the app closed when Location is set to Always. Pins stay on this phone, and so does "
+                    + "your location; each phone pins the stores it shops at.",
+            ],
+            keys: [
+                GuideKey(systemImage: "mappin", name: "Pin here",
+                         does: "On the You tab: pins the store where you are now."),
             ]),
         GuidePart(
             id: "map", title: "Map the store", systemImage: "map",
