@@ -178,7 +178,7 @@ public enum Milestones {
                   howTo: "Hold an item on the list and drag it onto another.", guidePart: "list"),
             tryIt(Try.everything, facts, title: "Look over a trip", systemImage: "tray.full",
                   does: "Your last trip in the order you grabbed things, and everything the store remembers.",
-                  howTo: "Tap Everything on a list, or tap Done after a trip.", guidePart: "everything"),
+                  howTo: "Tap Everything on the List tab at home.", guidePart: "everything"),
             tryIt(Try.spot, facts, title: "Set an item's spot", systemImage: "mappin.and.ellipse",
                   does: "Say yourself whether something moves around or has a fixed spot.",
                   howTo: "Hold an item, then pick Moves around or Fixed spot under Spot.", guidePart: "learning"),

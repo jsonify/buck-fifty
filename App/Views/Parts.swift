@@ -311,7 +311,7 @@ struct PinShape: Shape {
 /// How a row's detail line reads: plain, an alert (it moved, it's late), or information (a guessed zone).
 enum DetailTone { case soft, alert, info }
 
-/// One item on a card: the check mark, its name and detail, an accessory, how many, and its walk number.
+/// One item on a card: the check mark (in the store), its name and detail, an accessory, how many, and its walk number.
 struct ItemRow: View {
     let name: String
     var detail: String?
@@ -322,16 +322,19 @@ struct ItemRow: View {
     var isNext = false
     var showsDivider = false
     var accessory: AnyView?
-    let toggle: () -> Void
+    /// Checks it off; nil for a row with no check mark (the list at home, before the trip).
+    var toggle: (() -> Void)?
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: toggle) { CheckCircle(isOn: isChecked).frame(width: 44, height: 44) }
-                .buttonStyle(.plain)
-                .padding(.horizontal, -9)
-                .accessibilityLabel(isChecked ? "\(name), in the cart" : name)
-                .accessibilityHint(isChecked ? "Takes it out of the cart" : "Checks it off")
+            if let toggle {
+                Button(action: toggle) { CheckCircle(isOn: isChecked).frame(width: 44, height: 44) }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, -9)
+                    .accessibilityLabel(isChecked ? "\(name), got it" : name)
+                    .accessibilityHint(isChecked ? "Puts it back on the list to get" : "Got it: checks it off")
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
                     .font(.system(size: 16, weight: .semibold))
@@ -419,7 +422,7 @@ struct TripBar<Keys: View>: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            SKKeyTray { keys }
+            if Keys.self != EmptyView.self { SKKeyTray { keys } }
             Button(action: action) {
                 Label(title, systemImage: systemImage).frame(maxWidth: .infinity)
             }

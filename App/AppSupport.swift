@@ -6,7 +6,7 @@ import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
 /// previews); `-demoScreen <name>` opens one screen: home (with home-checklist and home-levels scrolled to Coming
-/// up), list (default), list-az (the list A to Z), past (Past items), add, trip, edit, zone (the zone map), zones,
+/// up), list (default), past (the inventory), add, trip, edit, zone (the zone map), zones,
 /// floorplan, everything, map (the Map tab, during a trip), restock, you, stores (the store chooser), tour, guide, milestones,
 /// or milestones-levels.
 enum Launch {
@@ -49,10 +49,6 @@ final class Profile {
         didSet { defaults.set(hasSeenTour, forKey: "hasSeenTour") }
     }
 
-    /// How the List tab groups the list: a stop per zone, or one A to Z card.
-    var listGrouping: ListGrouping {
-        didSet { defaults.set(listGrouping.rawValue, forKey: "listGrouping") }
-    }
     /// How the home screen shows milestones (issue #23).
     var milestoneStyle: MilestoneStyle {
         didSet { defaults.set(milestoneStyle.rawValue, forKey: "milestoneStyle") }
@@ -64,6 +60,11 @@ final class Profile {
     /// The milestones already announced, as "store id/milestone id", so each is announced once.
     private(set) var seenMilestones: Set<String> {
         didSet { defaults.set(Array(seenMilestones).sorted(), forKey: "seenMilestones") }
+    }
+    /// What this phone's trip marked Not here (by entry id). Kept on the phone, so the shared list's iCloud schema
+    /// doesn't change; the items themselves just stay on the list. Cleared when the next trip starts.
+    var notHere: NotHereMarks {
+        didSet { defaults.set(Array(notHere.ids).sorted(), forKey: "notHere") }
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -79,10 +80,10 @@ final class Profile {
         mapsStore = defaults.bool(forKey: "mapsStore")
         tripsFollowLocation = defaults.bool(forKey: "tripsFollowLocation")
         hasSeenTour = defaults.bool(forKey: "hasSeenTour")
-        listGrouping = defaults.string(forKey: "listGrouping").flatMap(ListGrouping.init(rawValue:)) ?? .zone
         milestoneStyle = defaults.string(forKey: "milestoneStyle").flatMap(MilestoneStyle.init(rawValue:)) ?? .checklist
         tried = Set(defaults.stringArray(forKey: "triedFeatures") ?? [])
         seenMilestones = Set(defaults.stringArray(forKey: "seenMilestones") ?? [])
+        notHere = NotHereMarks(Set(defaults.stringArray(forKey: "notHere") ?? []))
     }
 
     /// Marks a try-it milestone done (`Milestones.Try`): call it where the feature is used.
@@ -111,14 +112,6 @@ final class Profile {
     }
 
     var shopper: Shopper { Shopper(id: id, name: name.isEmpty ? "Me" : name) }
-}
-
-/// How the List tab groups the list.
-enum ListGrouping: String, CaseIterable {
-    /// A stop per zone in walking order, on the rail, with walk numbers.
-    case zone
-    /// Everything on one card, A to Z, each row saying its zone.
-    case alphabetical
 }
 
 /// How the home screen shows milestones: two takes on issue #23, to choose between on the You tab.
