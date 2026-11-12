@@ -12,7 +12,8 @@ struct EditingItem: Identifiable {
 }
 
 /// Everything a store remembers, whether it's on the list or not. Opens by itself after Done, so a trip can be
-/// reviewed: the last trip in the order things were checked off, then every item in walking order under its zone.
+/// reviewed: what the trip didn't get (it stays on the list for next time, or Drop takes it off), the last trip in the
+/// order things were checked off, then every item in walking order under its zone.
 /// Tap an item to set its zone, rename it, put it back on the list or forget it; hold and drag one onto another to
 /// move it in the walk. Zone guesses run here for anything without a zone, and say why when they can't.
 struct EverythingSheet: View {
@@ -22,13 +23,18 @@ struct EverythingSheet: View {
     @Environment(Profile.self) private var profile
     @FetchRequest private var items: FetchedResults<Item>
     @FetchRequest private var zones: FetchedResults<Zone>
+    @FetchRequest private var entries: FetchedResults<ListEntry>
     @State private var editing: EditingItem?
     @State private var dropTarget: NSManagedObjectID?
+    /// Opened by Done: start with what the trip didn't get.
+    let showsLeftovers: Bool
 
-    init(store: Store) {
+    init(store: Store, showsLeftovers: Bool = false) {
         self.store = store
+        self.showsLeftovers = showsLeftovers
         _items = FetchRequest(fetchRequest: Fetch.items(in: store))
         _zones = FetchRequest(fetchRequest: Fetch.zones(in: store))
+        _entries = FetchRequest(fetchRequest: Fetch.entries(in: store))
     }
 
     private var service: ListService { ListService(context: context) }
@@ -41,6 +47,7 @@ struct EverythingSheet: View {
                     .sk1Hint()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
+                if showsLeftovers { leftovers }
                 guesses
                 lastTrip
                 everything
@@ -57,6 +64,39 @@ struct EverythingSheet: View {
             ZoneGuessing.guessMissing(in: store, context: context)
             profile.markTried(Milestones.Try.everything)
         }
+    }
+
+    // MARK: What the trip didn't get
+
+    /// What's still on the list after Done. It stays for the next list unless you drop it; the store remembers it
+    /// either way, in Past items.
+    @ViewBuilder private var leftovers: some View {
+        let left = HomeOrder.sorted(entries.filter { !$0.isChecked })
+        if !left.isEmpty {
+            SKGroup(caption: "Didn't get · \(left.count)",
+                    note: "These stay on the list for your next trip. Drop takes one off; it's still in Past items.") {
+                ForEach(left, id: \.objectID) { entry in
+                    SKRow(title: entry.displayName,
+                          subtitle: entry.item?.storeZone?.displayName ?? ListOrdering.unzonedTitle) {
+                        Button("Drop") { drop(entry) }
+                            .buttonStyle(.sk1Key(size: .small))
+                            .accessibilityLabel("Drop \(entry.displayName)")
+                    }
+                }
+            }
+            if left.count > 1 {
+                Button("Drop all \(left.count)") {
+                    service.dropLeftovers(in: store)
+                    try? service.save()
+                }
+                .buttonStyle(.sk1Key())
+            }
+        }
+    }
+
+    private func drop(_ entry: ListEntry) {
+        service.remove(entry)
+        try? service.save()
     }
 
     // MARK: Zone guesses

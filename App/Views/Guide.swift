@@ -59,11 +59,19 @@ enum Guide {
             ]),
         GuidePart(
             id: "list", title: "The list", systemImage: "list.bullet",
-            summary: "Each store has its own list, in the order you walk the store: a stop for each zone, on a rail "
-                + "from the door to the checkout.",
+            summary: "Each store has its own list. At home it's a plain list in your own order; in the store it "
+                + "sorts itself into the order you walk the store: a stop for each zone, on a rail from the door to "
+                + "the checkout.",
             points: [
-                "Type in the field to add something. Things the store remembers come up as you type, with their zone: "
-                    + "tap one to add it. Adding something that's already on the list adds one more (×2).",
+                "Type in the field to add something; Return adds it and leaves the keyboard up for the next one. "
+                    + "Things the store remembers come up as you type, with their zone: tap one to add it. Adding "
+                    + "something that's already on the list adds one more (×2).",
+                "Past items, over the list, is everything you've bought here before: what you buy most, what's "
+                    + "running low, the last trip, or A to Z, with a find field. Tap things to put them on the list. "
+                    + "They stay off the list itself, so each trip starts with a clean list.",
+                "At home the list is in your order: new things go at the bottom, and you hold one and drag it onto "
+                    + "another to move it there. Start a trip (or check something off) and it sorts itself by "
+                    + "where things are in the store.",
                 "Tap a row to check it off. Hold a row to edit its name, zone, spot, how many and a note, or to "
                     + "remove it.",
                 "Every row in the walk has a number: the order you'll pick it up. The numbers stay put as you check "
@@ -71,20 +79,21 @@ enum Guide {
                     + "blue on the rail.",
                 "Look for it, at the top, holds things that move around the store, with where they've been seen. "
                     + "They have no number.",
-                "Hold an item and drag it onto another: it takes that one's place in the walk, and its zone. The "
-                    + "list remembers where you put it.",
+                "In the store, hold an item and drag it onto another: it takes that one's place in the walk, and its "
+                    + "zone. The list remembers where you put it.",
                 "Each zone is one stop, in the order your walk reaches it, so a zone never shows up twice. The only "
                     + "numbers on the list are the walk numbers on the right; the rail's dots turn blue with a tick as "
                     + "each stop is done.",
-                "The switch over the list groups it By zone (stops on the rail, with walk numbers) or A to Z (one "
-                    + "card by name, each row saying its zone, no numbers and no dragging). Your phone remembers "
-                    + "which.",
-                "At home the list starts with a strip of what's running low, one tap each.",
+                "The switch over the list shows it My order at home, By zone in the store (stops on the rail, with "
+                    + "walk numbers), or A to Z (one card by name, each row saying its zone, no numbers and no "
+                    + "dragging). Your phone remembers which.",
                 "On a shared list, rows say who added them, or whose cart they're in.",
                 "The LCD says At home or In the store and how many things are left. In the store it names the next "
                     + "thing to get, and its strip has a cell per stop: full once done, half for the next one.",
             ],
             keys: [
+                GuideKey(systemImage: "clock.arrow.circlepath", name: "Past items",
+                         does: "Everything you've bought here before, to tap onto the list."),
                 GuideKey(systemImage: "square.stack.3d.up", name: "Zones",
                          does: "The store's zones in walking order, to reorder, add, delete or start from a layout."),
                 GuideKey(systemImage: "tray.full", name: "Everything",
@@ -94,7 +103,8 @@ enum Guide {
                 GuideKey(systemImage: "person.badge.plus", name: "Share",
                          does: "Invites someone to the list. It stays lit once the list is shared."),
                 GuideKey(systemImage: "flag.checkered", name: "Start trip / Done",
-                         does: "Starts a trip at the door; Done ends it and takes what you bought off the list."),
+                         does: "Starts a trip at the door; Done ends it, takes what you bought off the list and asks about "
+                             + "what you didn't get."),
             ]),
         GuidePart(
             id: "storemap", title: "The Map tab", systemImage: "map.fill",
@@ -156,8 +166,9 @@ enum Guide {
                 "Tap Start trip at the door, or just check something off: that starts one too.",
                 "Every check-off is saved with its time. Uncheck something during the trip and that check-off is "
                     + "forgotten, so a mis-tap teaches nothing.",
-                "Done ends the trip: what you bought comes off the list (the store still remembers it) and Everything "
-                    + "opens so you can review the trip.",
+                "Done ends the trip: what you bought comes off the list (the store still remembers it, in Past items) "
+                    + "and Everything opens so you can review the trip. What you didn't get stays on the list for next "
+                    + "time, unless you drop it there.",
                 "A trip with no check-offs for 45 minutes ends by itself.",
                 "Each person has their own trip, so two people splitting up don't mix their routes.",
             ]),
@@ -185,6 +196,8 @@ enum Guide {
             id: "everything", title: "Everything", systemImage: "tray.full",
             summary: "Everything is your last trip and every item the store remembers. It opens by itself after Done.",
             points: [
+                "Opened by Done, it starts with what the trip didn't get: it stays on the list for next time, or Drop "
+                    + "(or Drop all) takes it off so the next list starts clean.",
                 "The last trip shows what you bought, in the order you checked it off.",
                 "Under it, every item the store remembers, in walking order under its zone, with where in the walk "
                     + "it's grabbed.",

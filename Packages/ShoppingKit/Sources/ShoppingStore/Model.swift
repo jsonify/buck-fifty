@@ -79,6 +79,8 @@ public final class ListEntry: NSManagedObject {
     @NSManaged public var addedByName: String?
     @NSManaged public var checkedByID: String?
     @NSManaged public var checkedByName: String?
+    /// Its place in your own order on the list at home (`HomeOrder`); nil for an entry from before there was one.
+    @NSManaged public var homeOrder: NSNumber?
     @NSManaged public var item: Item?
 }
 
@@ -197,6 +199,7 @@ public enum ShoppingModel {
             attribute("addedByName", .stringAttributeType),
             attribute("checkedByID", .stringAttributeType),
             attribute("checkedByName", .stringAttributeType),
+            attribute("homeOrder", .doubleAttributeType),
         ]
         let trip = entity(Trip.self, "Trip")
         trip.properties = [
@@ -285,7 +288,10 @@ extension Item {
     }
 }
 
-extension ListEntry {
+extension ListEntry: HomeOrderable {
     public var displayName: String { item?.displayName ?? "" }
+    public var sortName: String { displayName }
+    public var addedAt: Date? { createdAt }
+    public var homePlace: Double? { homeOrder?.doubleValue }
 }
 #endif
