@@ -30,7 +30,9 @@ concurrency:
 
 jobs:
   upload:
-    runs-on: macos-latest
+    # Jason's own Mac (a self-hosted runner, see README "Self-hosted Mac runner"). To go back to GitHub's macOS
+    # runners, set the repository variable MAC_RUNNER to "macos-latest" (with the quotes).
+    runs-on: ${{ fromJSON(vars.MAC_RUNNER || '["self-hosted","macOS"]') }}
     timeout-minutes: 45
     env:
       TEAM_ID: TS339TNM5P
@@ -62,15 +64,20 @@ jobs:
 
       - name: Select newest Xcode
         if: steps.secrets.outputs.ready == 'true'
+        # GitHub's images have several Xcode_<version>.app; a self-hosted Mac uses whichever Xcode xcode-select
+        # points at (set it once on the Mac).
         run: |
-          NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
-          sudo xcode-select -s "$NEWEST"
+          if ls -d /Applications/Xcode_*.app >/dev/null 2>&1; then
+            NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+            sudo xcode-select -s "$NEWEST"
+          fi
+          xcode-select -p
           xcodebuild -version
 
       - name: Generate Xcode project
         if: steps.secrets.outputs.ready == 'true'
         run: |
-          brew install xcodegen
+          command -v xcodegen >/dev/null || brew install xcodegen
           xcodegen generate
 
       - name: Resolve packages (SK1Kit)
@@ -95,6 +102,11 @@ jobs:
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           rm "$RUNNER_TEMP/dist.p12"
           security find-identity -v -p codesigning "$keychain"
+          # Sign by the identity's SHA-1, not its name: a self-hosted Mac's login keychain may hold another
+          # "Apple Distribution" identity, and a name matching two is ambiguous.
+          identity=$(security find-identity -v -p codesigning "$keychain" | awk '/Apple Distribution/ {print $2; exit}')
+          test -n "$identity" || { echo "::error::DISTRIBUTION_CERTIFICATE_P12 holds no Apple Distribution identity"; exit 1; }
+          echo "CERT_IDENTITY=$identity" >> "$GITHUB_ENV"
           serial=$(security find-certificate -c "Apple Distribution" -p "$keychain" | openssl x509 -noout -serial | cut -d= -f2)
           test -n "$serial" || { echo "::error::DISTRIBUTION_CERTIFICATE_P12 holds no Apple Distribution certificate"; exit 1; }
           echo "CERT_SERIAL=$serial" >> "$GITHUB_ENV"
@@ -126,8 +138,8 @@ jobs:
           # The app picks its profile by name; targets with none (the packages) get an empty one.
           cat > "$RUNNER_TEMP/signing.xcconfig" <<EOF
           CODE_SIGN_STYLE = Manual
-          CODE_SIGN_IDENTITY = Apple Distribution
-          CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
+          CODE_SIGN_IDENTITY = $CERT_IDENTITY
+          CODE_SIGN_IDENTITY[sdk=iphoneos*] = $CERT_IDENTITY
           DEVELOPMENT_TEAM = $TEAM_ID
           BUCKFIFTY_PROFILE_BuckFifty = Buck Fifty CI $APP_ID
           PROVISIONING_PROFILE_SPECIFIER = \$(BUCKFIFTY_PROFILE_\$(TARGET_NAME))
@@ -162,7 +174,7 @@ jobs:
             <key>destination</key><string>upload</string>
             <key>teamID</key><string>$TEAM_ID</string>
             <key>signingStyle</key><string>manual</string>
-            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>signingCertificate</key><string>$CERT_IDENTITY</string>
             <key>provisioningProfiles</key>
             <dict>
               <key>$APP_ID</key><string>Buck Fifty CI $APP_ID</string>
@@ -185,6 +197,9 @@ jobs:
       - name: Clean up signing
         if: always() && steps.secrets.outputs.ready == 'true'
         run: |
+          # Take the throwaway keychain back out of the search list too: on a self-hosted Mac that list is the
+          # user's own and outlives the job.
+          security list-keychains -d user -s $(security list-keychains -d user | tr -d '"' | grep -v signing.keychain-db)
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true
           rm -rf "$RUNNER_TEMP/keys"
 

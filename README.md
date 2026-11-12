@@ -184,9 +184,57 @@ Every pull request runs one macOS job: the SK-1 audit and the package tests (war
 builds the app for the iOS Simulator, runs it, and uploads screenshots of each screen in light and dark as the
 `screenshots` artifact.
 
+Every job (CI, commit messages, TestFlight) runs on a self-hosted runner on Jason's Mac, labelled `self-hosted` and
+`macOS`; see "Self-hosted Mac runner" below. To run them on GitHub's macOS runners instead, set the repository
+variable `MAC_RUNNER` (Settings › Secrets and variables › Actions › Variables) to `"macos-latest"`, quotes included.
+Pull requests from forks don't run on the Mac at all.
+
+### Self-hosted Mac runner
+
+The Mac has to stay on, awake and logged in. One-time setup, in Terminal on that Mac:
+
+1. **Xcode.** Install Xcode 16.4 or later from the App Store, then:
+
+   ```sh
+   sudo xcode-select -s /Applications/Xcode.app
+   sudo xcodebuild -license accept
+   xcodebuild -runFirstLaunch
+   xcodebuild -downloadPlatform iOS        # the iOS simulator, for the screenshots
+   ```
+
+2. **Homebrew and XcodeGen.** Install [Homebrew](https://brew.sh) if it isn't there, then `brew install xcodegen`.
+3. **The runner.** GitHub › this repo › Settings › Actions › Runners › **New self-hosted runner** › macOS, and the
+   architecture of the Mac (ARM64 for Apple silicon). Run the Download and Configure commands that page shows, in a
+   new folder such as `~/actions-runner`. The token in them is single-use and expires in an hour. Press Return at
+   each question: the default labels (`self-hosted`, `macOS` and the architecture) are the ones the workflows ask for.
+4. **Run it as a service**, so it starts at login and restarts if it stops:
+
+   ```sh
+   cd ~/actions-runner
+   ./svc.sh install
+   ./svc.sh start
+   ./svc.sh status
+   ```
+
+   The runner should show **Idle** on the Runners page. It's a LaunchAgent: it runs while you're logged in. To come
+   back after a reboot without you, turn on System Settings › Users & Groups › Automatically log in as (needs
+   FileVault off), and stop the Mac sleeping (System Settings › Energy › Prevent automatic sleeping when the display
+   is off).
+5. **Fork pull requests.** Settings › Actions › General › "Approval for running fork pull request workflows from
+   contributors": **Require approval for all external contributors**. The workflows skip forks anyway; this is the
+   second lock.
+
+If a job can't find `xcodegen` or `brew`, the service has an older `PATH`: `cd ~/actions-runner && echo "$PATH" > .path
+&& ./svc.sh stop && ./svc.sh start`. Logs are in `~/Library/Logs/actions.runner.*`.
+
+On the Mac, the TestFlight job imports the distribution certificate into a throwaway keychain, signs by its SHA-1 (so
+another "Apple Distribution" identity in your login keychain doesn't clash), and removes that keychain from the search
+list and deletes it afterwards. Its App Store profiles land in `~/Library/MobileDevice/Provisioning Profiles`. The
+screenshots reuse an iPhone simulator that's already booted, if there is one.
+
 ### TestFlight (no Mac build needed)
 
-`.github/workflows/testflight.yml` (adapted from Meetball's) archives Buck Fifty on a GitHub macOS runner, signs it
+`.github/workflows/testflight.yml` (adapted from Meetball's) archives Buck Fifty on the Mac runner, signs it
 for the App Store and uploads it to TestFlight. It runs on every push to `main` that touches the app (`App/`,
 `Packages/` or `project.yml`), and by hand from Actions › TestFlight › Run workflow. The build number is the commit
 count, so each upload is newer than the last. Install the **TestFlight** app on the iPhone; new builds then arrive
