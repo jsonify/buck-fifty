@@ -322,6 +322,8 @@ struct ItemRow: View {
     var isNext = false
     var showsDivider = false
     var accessory: AnyView?
+    /// Shows a red remove button at the end of the row (the List's Remove key is on) that calls this.
+    var remove: (() -> Void)?
     let toggle: () -> Void
     @Environment(\.colorScheme) private var scheme
 
@@ -350,6 +352,17 @@ struct ItemRow: View {
                 Text("×\(quantity)").font(.system(size: 13, weight: .bold)).sk1Ink(soft: true)
             }
             if let number, !isChecked { WalkBadge(number: number, isNext: isNext) }
+            if let remove {
+                Button(action: remove) {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(.white, Hybrid.redFill)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, -9)
+                .accessibilityLabel("Remove \(name) from the list")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

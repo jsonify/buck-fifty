@@ -54,6 +54,12 @@ struct ListScreen: View {
     @State private var appliedDemo = false
     /// The row a dragged item is over: it will take that row's place.
     @State private var dropTarget: NSManagedObjectID?
+    /// The Remove key is on: every row has a red remove button.
+    @State private var isRemoving = false
+    /// What was just taken off the list, while Undo is offered.
+    @State private var lastRemoved: RemovedEntry?
+    /// Changes with every removal, so the Undo bar's timer starts over.
+    @State private var removalCount = 0
 
     init(store: Store) {
         self.store = store
@@ -93,7 +99,19 @@ struct ListScreen: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .padding(.horizontal, 4)
                         } else {
-                            groupingSwitch.padding(.horizontal, 4).padding(.bottom, 12)
+                            HStack(spacing: 8) {
+                                groupingSwitch
+                                removeKey
+                            }
+                            .padding(.horizontal, 4)
+                            .padding(.bottom, isRemoving ? 6 : 12)
+                            if isRemoving {
+                                Text("Tap the red button to take something off. The Remove key turns this off.")
+                                    .sk1Hint()
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.horizontal, 4)
+                                    .padding(.bottom, 12)
+                            }
                         }
                         if profile.listGrouping == .alphabetical {
                             if !walk.rows.isEmpty { alphabeticalList(walk).padding(.horizontal, 4) }
@@ -111,6 +129,7 @@ struct ListScreen: View {
                 .padding(.vertical, 4)
             }
             .scrollDismissesKeyboard(.interactively)
+            if let lastRemoved { undoBar(lastRemoved) }
             TripBar(title: tripTitle, systemImage: trip == nil ? "cart" : "checkmark", action: toggleTrip) {
                 Button { showingZones = true } label: { Image(systemName: "square.stack.3d.up") }
                     .buttonStyle(.sk1Key())
@@ -127,7 +146,9 @@ struct ListScreen: View {
             }
         }
         .padding(.top, 4)
-        .sheet(item: $editing) { EditEntrySheet(entry: $0.entry, zones: Array(zones)) }
+        .sheet(item: $editing) {
+            EditEntrySheet(entry: $0.entry, zones: Array(zones)) { offerUndo($0) }
+        }
         .sheet(isPresented: $showingZones) { ZonesSheet(store: store) }
         .sheet(isPresented: $showingFloorPlan) { FloorPlanSheet(store: store) }
         .sheet(isPresented: $showingEverything, onDismiss: { reviewingTrip = false }) {
@@ -142,6 +163,46 @@ struct ListScreen: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { actions.endLapsedTrips() }
         }
+        .onChange(of: entries.isEmpty) { _, isEmpty in
+            if isEmpty { isRemoving = false }
+        }
+        .task(id: removalCount) {
+            // Undo is offered for a few seconds after each removal (the demo keeps it up for its screenshot).
+            guard lastRemoved != nil, !Launch.isDemo else { return }
+            try? await Task.sleep(for: .seconds(6))
+            if !Task.isCancelled { withAnimation { lastRemoved = nil } }
+        }
+    }
+
+    /// The Remove key over the list: turns on a red remove button on every row.
+    private var removeKey: some View {
+        Button { withAnimation { isRemoving.toggle() } } label: {
+            Label("Remove", systemImage: "minus.circle")
+        }
+        .buttonStyle(.sk1Key(isOn: isRemoving))
+        .accessibilityLabel(isRemoving ? "Stop removing" : "Remove items")
+        .accessibilityHint("Puts a remove button on every row")
+    }
+
+    /// Under the list after a removal: what came off, and Undo to put it back.
+    private func undoBar(_ removed: RemovedEntry) -> some View {
+        ListCard {
+            HStack(spacing: 10) {
+                Image(systemName: "trash").foregroundStyle(Hybrid.redFill)
+                Text("Removed \(removed.name)")
+                    .font(.system(size: 15, weight: .semibold))
+                    .sk1Ink()
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Button("Undo") { undo(removed) }
+                    .buttonStyle(.sk1Key())
+                    .accessibilityHint("Puts \(removed.name) back on the list")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+        }
+        .padding(.horizontal, 14)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private var tripTitle: String {
@@ -277,6 +338,7 @@ struct ListScreen: View {
                        isChecked: entry.isChecked, number: number, isNext: isNext,
                        showsDivider: index > 0,
                        accessory: guessed ? AnyView(guessedChip(entry)) : nil,
+                       remove: isRemoving ? { remove(entry) } : nil,
                        toggle: { actions.toggle(entry) })
             .onTapGesture { actions.toggle(entry) }
             .contextMenu {
@@ -284,6 +346,7 @@ struct ListScreen: View {
                 Button("Remove from list", systemImage: "trash", role: .destructive) { remove(entry) }
             }
             .accessibilityAction(named: "Edit") { editing = Editing(entry: entry) }
+            .accessibilityAction(named: "Remove from list") { remove(entry) }
     }
 
     private func guessedChip(_ entry: ListEntry) -> some View {
@@ -404,7 +467,21 @@ struct ListScreen: View {
     }
 
     private func remove(_ entry: ListEntry) {
-        service.remove(entry)
+        let removed = withAnimation { service.remove(entry) }
+        actions.save()
+        if let removed { offerUndo(removed) }
+    }
+
+    private func offerUndo(_ removed: RemovedEntry) {
+        withAnimation { lastRemoved = removed }
+        removalCount += 1
+    }
+
+    private func undo(_ removed: RemovedEntry) {
+        withAnimation {
+            _ = service.restore(removed)
+            lastRemoved = nil
+        }
         actions.save()
     }
 
@@ -428,6 +505,9 @@ struct ListScreen: View {
         case "floorplan": showingFloorPlan = true
         case "everything": showingEverything = true
         case "past": showingPast = true
+        case "remove":
+            isRemoving = true
+            if let towels = entries.first(where: { $0.displayName == "Paper towels" }) { remove(towels) }
         case "edit", "zone": editing = entries.first { $0.displayName == "Coffee beans" }.map(Editing.init)
         default: break
         }

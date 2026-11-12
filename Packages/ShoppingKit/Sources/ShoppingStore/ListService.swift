@@ -220,9 +220,45 @@ public struct ListService {
     }
 
     /// Takes an entry off the list. The item is still remembered.
-    public func remove(_ entry: ListEntry) {
+    /// Takes the entry off the list. The item stays remembered (Past items, Everything). Returns what Undo needs to
+    /// put it back with `restore(_:)`.
+    @discardableResult
+    public func remove(_ entry: ListEntry) -> RemovedEntry? {
+        let removed = entry.item.map {
+            RemovedEntry(item: $0, name: entry.displayName, quantity: entry.quantity, note: entry.note,
+                         isChecked: entry.isChecked, createdAt: entry.createdAt, homeOrder: entry.homeOrder,
+                         addedByID: entry.addedByID, addedByName: entry.addedByName,
+                         checkedByID: entry.checkedByID, checkedByName: entry.checkedByName)
+        }
         context.delete(entry)
         context.processPendingChanges()
+        return removed
+    }
+
+    /// Puts a removed entry back where it was (Undo). If the item went back on the list in the meantime, that line
+    /// gets its count instead of a second line. Returns nil once the item itself is gone.
+    @discardableResult
+    public func restore(_ removed: RemovedEntry) -> ListEntry? {
+        let item = removed.item
+        guard !item.isDeleted, item.managedObjectContext === context, let store = item.store else { return nil }
+        if !removed.isChecked, let open = (item.entries ?? []).first(where: { !$0.isChecked && !$0.isDeleted }) {
+            open.quantity += max(removed.quantity, 1)
+            return open
+        }
+        let entry = insert(ListEntry.self, alongside: store)
+        entry.id = UUID()
+        entry.quantity = max(removed.quantity, 1)
+        entry.note = removed.note
+        entry.isChecked = removed.isChecked
+        entry.createdAt = removed.createdAt
+        entry.homeOrder = removed.homeOrder
+        entry.addedByID = removed.addedByID
+        entry.addedByName = removed.addedByName
+        entry.checkedByID = removed.checkedByID
+        entry.checkedByName = removed.checkedByName
+        entry.item = item
+        context.processPendingChanges()
+        return entry
     }
 
     // MARK: Remembered items
@@ -484,6 +520,37 @@ public struct ListService {
             context.assign(object, to: store)
         }
         return object
+    }
+}
+/// A list entry that `ListService.remove(_:)` took off, kept so Undo can put it back (`ListService.restore(_:)`).
+public struct RemovedEntry {
+    /// The item's name, for "Removed …".
+    public let name: String
+    let item: Item
+    let quantity: Int64
+    let note: String?
+    let isChecked: Bool
+    let createdAt: Date?
+    let homeOrder: NSNumber?
+    let addedByID: String?
+    let addedByName: String?
+    let checkedByID: String?
+    let checkedByName: String?
+
+    init(item: Item, name: String, quantity: Int64, note: String?, isChecked: Bool, createdAt: Date?,
+         homeOrder: NSNumber?, addedByID: String?, addedByName: String?, checkedByID: String?,
+         checkedByName: String?) {
+        self.item = item
+        self.name = name
+        self.quantity = quantity
+        self.note = note
+        self.isChecked = isChecked
+        self.createdAt = createdAt
+        self.homeOrder = homeOrder
+        self.addedByID = addedByID
+        self.addedByName = addedByName
+        self.checkedByID = checkedByID
+        self.checkedByName = checkedByName
     }
 }
 #endif

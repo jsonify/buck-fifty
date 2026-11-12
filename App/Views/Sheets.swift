@@ -9,6 +9,8 @@ import ShoppingStore
 struct EditEntrySheet: View {
     @ObservedObject var entry: ListEntry
     let zones: [Zone]
+    /// Called with what Remove took off, so the screen underneath can offer Undo.
+    var removed: (RemovedEntry) -> Void = { _ in }
     @Environment(\.managedObjectContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -78,9 +80,10 @@ struct EditEntrySheet: View {
 
     private func remove() {
         let service = ListService(context: context)
-        service.remove(entry)
+        let taken = service.remove(entry)
         try? service.save()
         dismiss()
+        if let taken { removed(taken) }
     }
 }
 
