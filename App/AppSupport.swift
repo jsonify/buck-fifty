@@ -6,8 +6,8 @@ import ShoppingStore
 
 /// Launch arguments. `-demo` runs on an in-memory store filled with a sample Costco list (for screenshots and
 /// previews); `-demoScreen <name>` opens one screen: home (with home-checklist and home-levels scrolled to Coming
-/// up), list (default), list-az (the list A to Z), add, trip, edit, zone (the zone map), zones, floorplan,
-/// everything, map (the Map tab, during a trip), restock, you, stores (the store chooser), tour, guide, milestones,
+/// up), list (default), list-az (the list A to Z), past (Past items), add, trip, edit, zone (the zone map), zones,
+/// floorplan, everything, map (the Map tab, during a trip), restock, you, stores (the store chooser), tour, guide, milestones,
 /// or milestones-levels.
 enum Launch {
     static let arguments = ProcessInfo.processInfo.arguments
