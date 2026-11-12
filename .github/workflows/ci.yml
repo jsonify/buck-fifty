@@ -13,7 +13,11 @@ concurrency:
 
 jobs:
   apple:
-    runs-on: macos-latest
+    # Jason's own Mac (a self-hosted runner, see README "Self-hosted Mac runner"). To go back to GitHub's macOS
+    # runners, set the repository variable MAC_RUNNER to "macos-latest" (with the quotes).
+    runs-on: ${{ fromJSON(vars.MAC_RUNNER || '["self-hosted","macOS"]') }}
+    # A self-hosted runner on a public repo: never run a fork's pull request on it.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     timeout-minutes: 45
     # To push the screenshots to the ci-screenshots branch.
     permissions:
@@ -22,9 +26,14 @@ jobs:
       - uses: actions/checkout@v4
       # The newest Xcode on the runner: newer compilers report warnings older ones don't.
       - name: Select newest Xcode
+        # GitHub's images have several Xcode_<version>.app; a self-hosted Mac uses whichever Xcode xcode-select
+        # points at (set it once on the Mac).
         run: |
-          NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
-          sudo xcode-select -s "$NEWEST"
+          if ls -d /Applications/Xcode_*.app >/dev/null 2>&1; then
+            NEWEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+            sudo xcode-select -s "$NEWEST"
+          fi
+          xcode-select -p
           xcodebuild -version
       - name: sk1-audit
         run: Scripts/sk1-audit.sh App
@@ -42,7 +51,7 @@ jobs:
           restore-keys: spm-${{ runner.os }}-
       - name: Generate the Xcode project
         run: |
-          brew install xcodegen
+          command -v xcodegen >/dev/null || brew install xcodegen
           xcodegen generate
       # Builds the app for the simulator (its warnings are errors), runs it on sample data and screenshots each screen.
       - name: Build, run and screenshot on the iOS Simulator
