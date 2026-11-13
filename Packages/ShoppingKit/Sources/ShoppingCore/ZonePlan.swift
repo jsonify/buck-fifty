@@ -46,19 +46,56 @@ public struct PlanBlock: Sendable, Hashable {
     }
 }
 
-/// A store's floor plan drawing: its blocks, where the entrance is, and its shape (width over height).
+/// A point on a floor plan drawing, as fractions of the plan: x across, y down.
+public struct PlanPoint: Sendable, Hashable {
+    public var x: Double
+    public var y: Double
+
+    public init(x: Double, y: Double) {
+        self.x = x
+        self.y = y
+    }
+
+    /// The point kept on the plan (0...1 both ways).
+    public var clamped: PlanPoint { PlanPoint(x: min(max(x, 0), 1), y: min(max(y, 0), 1)) }
+
+    /// A point tapped on the `upright` drawing, back on the plan as drawn (the quarter turn undone).
+    public static func fromUpright(x: Double, y: Double) -> PlanPoint { PlanPoint(x: y, y: 1 - x) }
+
+    /// The point on the `upright` drawing.
+    public var upright: PlanPoint { PlanPoint(x: 1 - y, y: x) }
+}
+
+/// A store's floor plan drawing: its blocks, where the entrance and the exit are, and its shape (width over height).
 public struct PlanDrawing: Sendable, Hashable {
     public var aspect: Double
     public var blocks: [PlanBlock]
     /// The entrance, as fractions of the plan.
     public var entranceX: Double
     public var entranceY: Double
+    /// The way out, as fractions of the plan: the entrance unless the store says otherwise.
+    public var exitX: Double
+    public var exitY: Double
 
-    public init(aspect: Double, blocks: [PlanBlock], entranceX: Double, entranceY: Double) {
+    public init(aspect: Double, blocks: [PlanBlock], entranceX: Double, entranceY: Double,
+                exitX: Double? = nil, exitY: Double? = nil) {
         self.aspect = aspect
         self.blocks = blocks
         self.entranceX = entranceX
         self.entranceY = entranceY
+        self.exitX = exitX ?? entranceX
+        self.exitY = exitY ?? entranceY
+    }
+
+    public var entrance: PlanPoint { PlanPoint(x: entranceX, y: entranceY) }
+    public var exit: PlanPoint { PlanPoint(x: exitX, y: exitY) }
+
+    /// The drawing with the store's own entrance and exit where it has them (set by tapping the map).
+    public func withDoors(entrance: PlanPoint?, exit: PlanPoint?) -> PlanDrawing {
+        var drawing = self
+        if let entrance { (drawing.entranceX, drawing.entranceY) = (entrance.x, entrance.y) }
+        if let exit { (drawing.exitX, drawing.exitY) = (exit.x, exit.y) }
+        return drawing
     }
 
     /// The zones the drawing shows.
@@ -74,7 +111,73 @@ public struct PlanDrawing: Sendable, Hashable {
                                                width: block.rect.height, height: block.rect.width)
                         return turned
                     },
-                    entranceX: 1 - entranceY, entranceY: entranceX)
+                    entranceX: 1 - entranceY, entranceY: entranceX, exitX: 1 - exitY, exitY: exitX)
+    }
+
+    /// The middle of each zone's biggest block, keyed by the zone's normalized name: where its pin goes, and where a
+    /// walk through the store stops for it.
+    public var zoneCenters: [String: PlanPoint] {
+        var biggest: [String: PlanRect] = [:]
+        for block in blocks {
+            guard let zone = block.zone else { continue }
+            let key = ItemName.normalized(zone)
+            if let rect = biggest[key], rect.width * rect.height >= block.rect.width * block.rect.height { continue }
+            biggest[key] = block.rect
+        }
+        return biggest.mapValues { PlanPoint(x: $0.x + $0.width / 2, y: $0.y + $0.height / 2) }
+    }
+
+    /// `zoneNames` in the order a short walk visits them, in from the entrance and out at the exit: each zone at the
+    /// middle of its biggest block, the walk's length measured on the plan's real shape. Zones the drawing doesn't
+    /// show keep their place after the zone they followed before. It's a starting point; the trips refine it.
+    public func walkingOrder(of zoneNames: [String]) -> [String] {
+        let centers = zoneCenters
+        let onPlan = zoneNames.filter { centers[ItemName.normalized($0)] != nil }
+        guard onPlan.count > 1 else { return zoneNames }
+        func point(_ name: String) -> PlanPoint { centers[ItemName.normalized(name)]! }
+        func distance(_ a: PlanPoint, _ b: PlanPoint) -> Double {
+            let dx = (a.x - b.x) * aspect, dy = a.y - b.y
+            return (dx * dx + dy * dy).squareRoot()
+        }
+        // Nearest first from the entrance…
+        var route: [String] = []
+        var left = onPlan
+        var here = entrance
+        while !left.isEmpty {
+            let next = left.indices.min { distance(here, point(left[$0])) < distance(here, point(left[$1])) }!
+            here = point(left[next])
+            route.append(left.remove(at: next))
+        }
+        // …then untangled: reverse any stretch that makes the walk, door to door, shorter.
+        func stop(_ i: Int) -> PlanPoint { i < 0 ? entrance : i >= route.count ? exit : point(route[i]) }
+        var improved = true
+        var passes = 0
+        while improved, passes < 50 {
+            improved = false
+            passes += 1
+            for i in 0..<(route.count - 1) {
+                for j in (i + 1)..<route.count {
+                    let before = distance(stop(i - 1), stop(i)) + distance(stop(j), stop(j + 1))
+                    let after = distance(stop(i - 1), stop(j)) + distance(stop(i), stop(j + 1))
+                    if after < before - 1e-9 {
+                        route[i...j].reverse()
+                        improved = true
+                    }
+                }
+            }
+        }
+        // The zones not on the drawing, each after the zone it followed.
+        var result = route
+        for (index, name) in zoneNames.enumerated() where centers[ItemName.normalized(name)] == nil {
+            if index == 0 {
+                result.insert(name, at: 0)
+            } else if let after = result.firstIndex(of: zoneNames[index - 1]) {
+                result.insert(name, at: after + 1)
+            } else {
+                result.append(name)
+            }
+        }
+        return result
     }
 
     /// The block under a tap at (`x`, `y`) on a `width` × `height` drawing: the smallest block containing it, or else

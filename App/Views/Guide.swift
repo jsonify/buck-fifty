@@ -121,6 +121,10 @@ enum Guide {
                     + "laid out in walking order from the door.",
                 "Blue zones are done, the orange one is next, the rest are still ahead. The dashed blue line is the "
                     + "walk so far, from the door; the orange dot is about where you are.",
+                "IN is where you come in and OUT where you go out (one IN · OUT tag when it's the same doors). If "
+                    + "they're not where your store has them, tap the map or the door key, then tap the entrance and "
+                    + "the exit. With a floor plan, Order zones then puts the zones in the order a short walk from IN "
+                    + "to OUT reaches them; what your trips learned still comes first.",
                 "Each zone with something left has a pin: the walk number of the first thing there, the same number "
                     + "as on the list, with how many things are there when it's more than one. Under the map, the stops "
                     + "still to do and what's at them: tap one to check it off.",
@@ -129,6 +133,8 @@ enum Guide {
             ],
             keys: [
                 GuideKey(systemImage: "list.bullet", name: "List", does: "Opens the List tab."),
+                GuideKey(systemImage: "door.left.hand.open", name: "Entrance & exit",
+                         does: "Tap where you come in and where you go out on the map. Tapping the map does the same."),
                 GuideKey(systemImage: "map", name: "Floor plan",
                          does: "Where things are, from mapped trips. Only there with Map the store on."),
                 GuideKey(systemImage: "flag.checkered", name: "Start trip / Done",

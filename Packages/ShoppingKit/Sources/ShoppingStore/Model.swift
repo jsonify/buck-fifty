@@ -22,6 +22,12 @@ public final class Store: NSManagedObject {
     @NSManaged public var createdAt: Date?
     /// The compass heading of the store's aisles (degrees), learned from the first mapped trip (issue #5).
     @NSManaged public var gridHeading: NSNumber?
+    /// Where you come in and go out on the store's map, as fractions of it (x across, y down), set by tapping the
+    /// Map; nil for the floor plan's own (`entrance`, `exit`).
+    @NSManaged public var entranceX: NSNumber?
+    @NSManaged public var entranceY: NSNumber?
+    @NSManaged public var exitX: NSNumber?
+    @NSManaged public var exitY: NSNumber?
     @NSManaged public var zones: Set<Zone>?
     @NSManaged public var items: Set<Item>?
     @NSManaged public var trips: Set<Trip>?
@@ -166,6 +172,10 @@ public enum ShoppingModel {
             attribute("name", .stringAttributeType, default: ""),
             attribute("createdAt", .dateAttributeType),
             attribute("gridHeading", .doubleAttributeType),
+            attribute("entranceX", .doubleAttributeType),
+            attribute("entranceY", .doubleAttributeType),
+            attribute("exitX", .doubleAttributeType),
+            attribute("exitY", .doubleAttributeType),
         ]
         let zone = entity(Zone.self, "Zone")
         zone.properties = [
@@ -254,6 +264,16 @@ extension Store {
         (items ?? []).filter { !$0.isDeleted }.flatMap { ($0.entries ?? []).filter { !$0.isDeleted } }
     }
     public var remainingCount: Int { entries.filter { !$0.isChecked }.count }
+    /// The entrance set on the Map, if any.
+    public var entrance: PlanPoint? {
+        guard let entranceX, let entranceY else { return nil }
+        return PlanPoint(x: entranceX.doubleValue, y: entranceY.doubleValue)
+    }
+    /// The exit set on the Map, if any.
+    public var exit: PlanPoint? {
+        guard let exitX, let exitY else { return nil }
+        return PlanPoint(x: exitX.doubleValue, y: exitY.doubleValue)
+    }
 }
 
 extension CheckOff {

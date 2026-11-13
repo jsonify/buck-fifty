@@ -20,6 +20,7 @@ struct MapScreen: View {
     @FetchRequest private var items: FetchedResults<Item>
     @FetchRequest private var openTrips: FetchedResults<Trip>
     @State private var showingFloorPlan = false
+    @State private var showingDoors = false
     @State private var editing: Editing?
 
     init(store: Store) {
@@ -43,8 +44,12 @@ struct MapScreen: View {
             }
             walk.lcd(trip: trip, store: store, now: Date())
                 .padding(.horizontal, 14)
-            let map = WalkMap(walk: walk, inStore: trip != nil)
+            let map = WalkMap(walk: walk, store: store, inStore: trip != nil)
             WalkMapView(map: map)
+                .contentShape(Rectangle())
+                .onTapGesture { showingDoors = true }
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Sets the entrance and exit")
                 .padding(8)
                 .frame(maxWidth: .infinity)
                 .aspectRatio(CGFloat(map.aspect ?? 1.6), contentMode: .fit)
@@ -57,6 +62,9 @@ struct MapScreen: View {
                 Button { navigator.tab = .list } label: { Image(systemName: "list.bullet") }
                     .buttonStyle(.sk1Key())
                     .accessibilityLabel("The list")
+                Button { showingDoors = true } label: { Image(systemName: "door.left.hand.open") }
+                    .buttonStyle(.sk1Key())
+                    .accessibilityLabel("Entrance and exit")
                 if profile.mapsStore {
                     Button { showingFloorPlan = true } label: {
                         Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
@@ -68,6 +76,12 @@ struct MapScreen: View {
         }
         .padding(.top, 4)
         .sheet(isPresented: $showingFloorPlan) { FloorPlanSheet(store: store) }
+        .sheet(isPresented: $showingDoors) { DoorsSheet(store: store, zones: Array(zones)) }
+        .task {
+            guard Launch.isDemo, Launch.demoScreen == "doors" else { return }
+            try? await Task.sleep(for: .seconds(1))
+            showingDoors = true
+        }
         .sheet(item: $editing) { EditEntrySheet(entry: $0.entry, zones: Array(zones)) }
         .onAppear { actions.endLapsedTrips() }
         .onChange(of: scenePhase) { _, phase in
@@ -144,31 +158,32 @@ struct WalkMap {
     let blocks: [Block]
     /// Width over height, for a floor plan drawing; nil to fill the space (zones in walking order).
     let aspect: Double?
-    /// The entrance, in fractions of the map.
-    let entrance: CGPoint
+    /// The entrance and the exit, in fractions of the map.
+    let entrance: PlanPoint
+    let exit: PlanPoint
     let states: [Int: Walk.StopState]
     let pins: [Pin]
     /// The zones done so far, in walking order, then where you are: the walk's dashed line. Empty at home.
     let walked: [Int]
     let inStore: Bool
 
-    init(walk: WalkModel, inStore: Bool) {
+    init(walk: WalkModel, store: Store, inStore: Bool) {
         let names = walk.zoneNames
         func index(of zone: String?) -> Int? {
             guard let zone else { return nil }
             return names.firstIndex { ItemName.normalized($0) == ItemName.normalized(zone) }
         }
-        // The plan as drawn, wide, to fill the card across the phone.
-        if let plan = DefaultZones.plan(forZones: names) {
-            blocks = plan.blocks.map { Block(rect: $0.rect, zone: index(of: $0.zone), label: $0.label) }
-            aspect = plan.aspect
-            entrance = CGPoint(x: plan.entranceX, y: plan.entranceY)
+        // The plan as drawn, wide, to fill the card across the phone; the doors where the store has them.
+        let drawing = StoreDrawing(zoneNames: names, store: store)
+        if drawing.isFloorPlan {
+            blocks = drawing.plan.blocks.map { Block(rect: $0.rect, zone: index(of: $0.zone), label: $0.label) }
+            aspect = drawing.plan.aspect
         } else {
-            let grid = Self.layout(names)
-            blocks = grid
+            blocks = Self.layout(names)
             aspect = nil
-            entrance = CGPoint(x: grid.first.map { $0.rect.x + $0.rect.width / 2 } ?? 0.1, y: 1)
         }
+        entrance = drawing.plan.entrance
+        exit = drawing.plan.exit
         var states: [Int: Walk.StopState] = [:]
         for stop in walk.walkStops {
             guard case .zone(let zone) = stop.kind else { continue }
@@ -243,6 +258,7 @@ struct WalkMapView: View {
                         ZonePin(pin: pin).position(x: point.x, y: point.y - 4)
                     }
                 }
+                DoorMarkers(entrance: map.entrance, exit: map.exit, size: size)
                 if map.inStore {
                     youDot.position(you(size))
                 }
@@ -256,7 +272,7 @@ struct WalkMapView: View {
     private var accessibilityText: String {
         let next = map.pins.first(where: \.isNext).map { "Next is stop \($0.number)." } ?? ""
         let left = map.pins.reduce(0) { $0 + $1.count }
-        return "Store map. \(left) things to get in \(map.pins.count) zones. \(next)"
+        return "Store map. \(left) things to get in \(map.pins.count) zones. \(next) Tap to set the entrance and exit."
     }
 
     private var youDot: some View {
@@ -277,7 +293,7 @@ struct WalkMapView: View {
     }
 
     private func door(_ size: CGSize) -> CGPoint {
-        CGPoint(x: map.entrance.x * size.width, y: map.entrance.y * size.height)
+        CGPoint(x: CGFloat(map.entrance.x) * size.width, y: CGFloat(map.entrance.y) * size.height)
     }
 
     /// Where you are: the last zone done, or the door.
@@ -322,8 +338,6 @@ struct WalkMapView: View {
             context.stroke(walk, with: .color(Hybrid.blueFill),
                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [2, 6]))
         }
-        let doorPoint = door(size)
-        context.fill(Path(CGRect(x: doorPoint.x - 5, y: doorPoint.y - 5, width: 10, height: 10)), with: .color(ink))
     }
 }
 

@@ -37,6 +37,22 @@ final class ListServiceTests: XCTestCase {
         XCTAssertEqual(store.sortedZones.map(\.displayName), DefaultZones.costco)
     }
 
+    func testDoorsAndZoneOrderFromTheMap() throws {
+        let store = try makeCostco()
+        XCTAssertNil(store.entrance)
+        service.setDoors(of: store, entrance: PlanPoint(x: 0.2, y: 1.4), exit: PlanPoint(x: 0.9, y: 1))
+        try service.save()
+        XCTAssertEqual(store.entrance, PlanPoint(x: 0.2, y: 1))
+        XCTAssertEqual(store.exit, PlanPoint(x: 0.9, y: 1))
+        service.setDoors(of: store, entrance: nil, exit: nil)
+        XCTAssertNil(store.entrance)
+        XCTAssertNil(store.exit)
+
+        let reversed = Array(DefaultZones.costco.reversed())
+        service.orderZones(of: store, as: Array(reversed.prefix(3)))
+        XCTAssertEqual(store.sortedZones.map(\.displayName), Array(reversed.prefix(3)) + DefaultZones.costco.prefix(6))
+    }
+
     func testAddingRemembersItemsAndMergesRepeats() throws {
         let store = try makeCostco()
         let first = try XCTUnwrap(service.addToList("  Olive   oil ", store: store, by: jason))
