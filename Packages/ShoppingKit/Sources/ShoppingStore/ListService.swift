@@ -62,6 +62,30 @@ public struct ListService {
         }
     }
 
+    /// Puts the store's zones in the order of `names` (compared normalized). Zones not named keep their order, after
+    /// the named ones.
+    public func orderZones(of store: Store, as names: [String]) {
+        let rank = Dictionary(names.map(ItemName.normalized).enumerated().map { ($1, $0) },
+                              uniquingKeysWith: { first, _ in first })
+        let zones = store.sortedZones.enumerated().sorted { a, b in
+            let ra = rank[ItemName.normalized(a.element.displayName)] ?? names.count + a.offset
+            let rb = rank[ItemName.normalized(b.element.displayName)] ?? names.count + b.offset
+            return ra < rb
+        }.map(\.element)
+        for (index, zone) in zones.enumerated() where zone.sortIndex != Int64(index) {
+            zone.sortIndex = Int64(index)
+        }
+    }
+
+    /// Sets where you come in and go out on the store's map (fractions of it); nil puts one back to the plan's own.
+    public func setDoors(of store: Store, entrance: PlanPoint?, exit: PlanPoint?) {
+        let entrance = entrance?.clamped, exit = exit?.clamped
+        store.entranceX = entrance.map { NSNumber(value: $0.x) }
+        store.entranceY = entrance.map { NSNumber(value: $0.y) }
+        store.exitX = exit.map { NSNumber(value: $0.x) }
+        store.exitY = exit.map { NSNumber(value: $0.y) }
+    }
+
     /// Replaces the store's zones with `names`, in that walking order. A zone whose name (compared normalized) is in
     /// `names` stays, with its items; items in the zones that go away lose their zone, and can be guessed again.
     /// Blank and repeated names are skipped.

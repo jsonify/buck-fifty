@@ -180,6 +180,37 @@ final class ZonePlanTests: XCTestCase {
         XCTAssertEqual(upright.blocks[1].rect.x, 0.98, accuracy: 1e-9)
         XCTAssertEqual(upright.entranceX, 0)
         XCTAssertEqual(upright.entranceY, 1)
+        XCTAssertEqual(upright.exit, upright.entrance, "The exit is the entrance unless set")
+    }
+
+    func testDoorsSetOnTheMap() {
+        let moved = plan.withDoors(entrance: PlanPoint(x: 0, y: 1), exit: PlanPoint(x: 0.5, y: 1))
+        XCTAssertEqual(moved.entrance, PlanPoint(x: 0, y: 1))
+        XCTAssertEqual(moved.exit, PlanPoint(x: 0.5, y: 1))
+        XCTAssertEqual(plan.withDoors(entrance: nil, exit: nil), plan)
+        XCTAssertEqual(moved.upright.exit, moved.exit.upright)
+        // A tap on the upright drawing lands back where it was on the plan.
+        let point = PlanPoint(x: 0.3, y: 0.8)
+        let tapped = point.upright
+        XCTAssertEqual(PlanPoint.fromUpright(x: tapped.x, y: tapped.y).x, point.x, accuracy: 1e-9)
+        XCTAssertEqual(PlanPoint.fromUpright(x: tapped.x, y: tapped.y).y, point.y, accuracy: 1e-9)
+        XCTAssertEqual(PlanPoint(x: -1, y: 2).clamped, PlanPoint(x: 0, y: 1))
+    }
+
+    func testWalkingOrderFollowsTheDoors() {
+        // Four zones along the front, A at the left to D at the right, and one the drawing doesn't show.
+        let row = PlanDrawing(aspect: 4, blocks: ["A", "B", "C", "D"].enumerated().map { index, name in
+            PlanBlock(name, zone: name, x: 0.05 + Double(index) * 0.25, y: 0.4, width: 0.15, height: 0.2)
+        }, entranceX: 0, entranceY: 0.5)
+        let names = ["C", "Food court", "A", "D", "B"]
+        XCTAssertEqual(row.walkingOrder(of: names), ["A", "B", "C", "Food court", "D"],
+                       "Nearest first from the door; the food court stays after the C it followed")
+        let fromTheRight = row.withDoors(entrance: PlanPoint(x: 1, y: 0.5), exit: PlanPoint(x: 1, y: 0.5))
+        XCTAssertEqual(fromTheRight.walkingOrder(of: ["A", "B", "C", "D"]).first, "D")
+        // In at the left and out at the right: left to right, not back again.
+        let through = row.withDoors(entrance: PlanPoint(x: 0, y: 0.5), exit: PlanPoint(x: 1, y: 0.5))
+        XCTAssertEqual(through.walkingOrder(of: ["D", "B", "A", "C"]), ["A", "B", "C", "D"])
+        XCTAssertEqual(row.walkingOrder(of: ["Food court"]), ["Food court"])
     }
 
     func testTheAuroraVillagePlanCoversEveryZone() {

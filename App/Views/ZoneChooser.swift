@@ -47,7 +47,9 @@ struct ZoneChooserSheet: View {
     init(selection: Binding<Zone?>, zones: [Zone]) {
         _selection = selection
         self.zones = zones
-        let plan = DefaultZones.plan(forZones: zones.map(\.displayName))
+        let store = zones.first?.store
+        let plan = DefaultZones.plan(forZones: zones.map(\.displayName))?
+            .withDoors(entrance: store?.entrance, exit: store?.exit)
         self.plan = plan?.upright
         _mode = State(initialValue: plan == nil ? .list : .map)
     }
