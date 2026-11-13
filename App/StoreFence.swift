@@ -20,6 +20,11 @@ final class StoreFence {
     private(set) var pins: [String: StorePin] {
         didSet { UserDefaults.standard.set(StorePin.encode(pins), forKey: "storePins") }
     }
+    /// Stores the phone went out of during a trip and hasn't come back into. The trip ends once the leave is due
+    /// (`LocationTrips.leaveGrace`): inside a big store the location wanders, and a moment outside isn't leaving.
+    @ObservationIgnored private var leaves: PendingLeaves {
+        didSet { UserDefaults.standard.set(PendingLeaves.encode(leaves), forKey: "storeLeaves") }
+    }
     /// Finding where you are, for a pin.
     private(set) var isLocating = false
     /// Location access, as of the last look (`refresh()`).
@@ -34,6 +39,7 @@ final class StoreFence {
 
     private init() {
         pins = StorePin.decode(UserDefaults.standard.data(forKey: "storePins"))
+        leaves = PendingLeaves.decode(UserDefaults.standard.data(forKey: "storeLeaves"))
         authorization = manager.authorizationStatus
     }
 
@@ -49,7 +55,27 @@ final class StoreFence {
     /// Picks up watching at launch (in the background too, when a crossing relaunched the app).
     func resume() {
         guard !Launch.isDemo, profile.tripsFollowLocation else { return }
+        settleLeaves()
         Task { await watch() }
+    }
+
+    /// Ends the trips at stores the phone left long enough ago, each at the time it went out. Called at launch, as
+    /// the app comes forward and on every crossing; a trip started by hand after the phone went out is left alone.
+    func settleLeaves(now: Date = Date()) {
+        guard !Launch.isDemo, !leaves.leftAt.isEmpty else { return }
+        guard profile.tripsFollowLocation else {
+            leaves = PendingLeaves()
+            return
+        }
+        let context = AppModel.shared.persistence.viewContext
+        for (id, leftAt) in leaves.due(now: now) {
+            leaves.cancel(id)
+            guard let store = store(id: id) else { continue }
+            let service = ListService(context: context)
+            guard let trip = service.currentTrip(at: store, for: profile.shopper, now: now),
+                  (trip.startedAt ?? .distantPast) < leftAt else { continue }
+            end(trip, at: store, date: leftAt)
+        }
     }
 
     /// Turned on or off on the You tab: asks for location access when on, and watches the pinned stores or stops.
@@ -153,30 +179,45 @@ final class StoreFence {
 
     /// Starts or ends your trip at the store whose circle was crossed.
     private func cross(_ crossing: StoreCrossing, storeID: String, at date: Date) {
-        guard profile.tripsFollowLocation, let uuid = UUID(uuidString: storeID) else { return }
+        guard profile.tripsFollowLocation else { return }
+        // Back inside before the leave was due: the trip carries on as if the phone never went out.
+        if crossing == .arrived { leaves.cancel(storeID) }
+        settleLeaves(now: max(date, Date()))
+        guard let store = store(id: storeID) else { return }
         let context = AppModel.shared.persistence.viewContext
-        let request = NSFetchRequest<Store>(entityName: "Store")
-        request.predicate = NSPredicate(format: "id == %@", uuid as CVarArg)
-        guard let store = (try? context.fetch(request))?.first else { return }
         let service = ListService(context: context)
         let trip = service.currentTrip(at: store, for: profile.shopper, now: date)
-        let actions = TripActions(store: store, context: context, profile: profile)
         switch LocationTrips.action(for: crossing, hasOpenTrip: trip != nil, itemsLeft: store.remainingCount) {
         case .startTrip:
             // Not mapped: the edge of the car park isn't the door the map starts from.
-            actions.start(atDoor: false)
-        case .endTrip:
-            guard let trip else { return }
-            let empty = service.route(of: trip).isEmpty
-            _ = actions.finish(trip)
-            // Nothing checked off: you drove past, or went in for something else. It isn't a trip to remember.
-            if empty {
-                context.delete(trip)
-                actions.save()
-            }
+            TripActions(store: store, context: context, profile: profile).start(atDoor: false)
+        case .leaving:
+            // Not ended yet: it ends once the phone has stayed out for the grace (`settleLeaves`).
+            leaves.left(storeID, at: date)
         case .nothing:
             break
         }
+    }
+
+    /// Ends a trip the phone left with: the same as Done, at the time it went out.
+    private func end(_ trip: Trip, at store: Store, date: Date) {
+        let context = AppModel.shared.persistence.viewContext
+        let service = ListService(context: context)
+        let actions = TripActions(store: store, context: context, profile: profile)
+        let empty = service.route(of: trip).isEmpty
+        _ = actions.finish(trip, at: date)
+        // Nothing checked off: you drove past, or went in for something else. It isn't a trip to remember.
+        if empty {
+            context.delete(trip)
+            actions.save()
+        }
+    }
+
+    private func store(id: String) -> Store? {
+        guard let uuid = UUID(uuidString: id) else { return nil }
+        let request = NSFetchRequest<Store>(entityName: "Store")
+        request.predicate = NSPredicate(format: "id == %@", uuid as CVarArg)
+        return (try? AppModel.shared.persistence.viewContext.fetch(request))?.first
     }
 
     /// Where you are, as soon as it's good to a shop's width, or the best fix within 20 seconds.

@@ -238,8 +238,11 @@ enum Guide {
             points: [
                 "Each store is a circle on the map, pinned where you stand when you tap Pin here on the You tab, or "
                     + "the first time you tap Start trip there with this on.",
-                "Arriving starts a trip if there's something on the list. Leaving the circle ends it, the same as "
-                    + "Done: what you checked off comes off the list. A trip with nothing checked off is forgotten.",
+                "Arriving starts a trip if there's something on the list. Staying out of the circle for 10 minutes "
+                    + "ends it, the same as Done: what you checked off comes off the list. A trip with nothing checked "
+                    + "off is forgotten.",
+                "Back inside sooner, and the trip carries on: in a big store the phone's location can wander past "
+                    + "the edge, and that doesn't end the trip you're in.",
                 "The radius (100, 200 or 400 m) takes in the car park, so the trip ends as you drive away, not at "
                     + "the door. A big store in a wide car park wants 400.",
                 "It works with the app closed when Location is set to Always. Pins stay on this phone, and so does "
