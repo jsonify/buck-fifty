@@ -56,6 +56,8 @@ enum Guide {
                 GuideKey(systemImage: "cart", name: "Start trip",
                          does: "Tap it in the store: starts the trip, sorts the list by zone and opens it. Says Back to the "
                              + "trip while you're on one."),
+                GuideKey(systemImage: "lock", name: "Locker code",
+                         does: "Adds a pharmacy locker pickup, with its code, at the lockers."),
                 GuideKey(systemImage: "person.badge.plus", name: "Share",
                          does: "Invites someone to this store's list. It stays lit once the list is shared."),
                 GuideKey(systemImage: "person.crop.circle", name: "You",
@@ -249,18 +251,21 @@ enum Guide {
             ]),
         GuidePart(
             id: "lockers", title: "Pharmacy lockers", systemImage: "lock",
-            summary: "When the pharmacy texts a locker pickup, the pickup goes on the list at the lockers with its "
-                + "code, so it's there when you shop.",
+            summary: "When the pharmacy texts a locker pickup code, put it on the list at the lockers, so it's there "
+                + "when you shop.",
             points: [
-                "Apps can't read texts, so Shortcuts hands it over. In the Shortcuts app: Automation, New, Message; "
-                    + "Message Contains \"Pickup Code\" (and Sender, if you like, the number the texts come from, "
-                    + "at the top of the conversation in Messages, not the pharmacy's phone line); Run Immediately. "
-                    + "The action is Save locker code from Buck Fifty, with the Message.",
-                "Each text puts Pharmacy locker pickup on the Costco list, in the Pharmacy lockers zone, with the "
-                    + "code, who it's for and the last day to pick it up. Two orders waiting share one row; the same "
-                    + "text twice changes nothing.",
-                "Or copy the text and paste it into Add on Home or the list.",
+                "Tap the lock key on Home and type the pickup code from the text. Who it's for and how many days the "
+                    + "locker holds it (5 unless you change it) are optional. Or paste the whole text in the code "
+                    + "field: it fills everything in.",
+                "It goes on the list as Pharmacy locker pickup, in the Pharmacy lockers zone, with the code, who "
+                    + "it's for and the last day to pick it up. Two orders waiting share one row; the same code twice "
+                    + "changes nothing.",
+                "Pasting the text into Add on Home or the list does the same.",
                 "Check it off when you've got it, like anything else.",
+            ],
+            keys: [
+                GuideKey(systemImage: "lock", name: "Locker code",
+                         does: "On Home: adds a pharmacy locker pickup with its code."),
             ]),
         GuidePart(
             id: "map", title: "Map the store", systemImage: "map",

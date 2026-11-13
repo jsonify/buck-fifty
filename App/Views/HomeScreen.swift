@@ -25,6 +25,7 @@ struct HomeScreen: View {
     @State private var draft = ""
     @State private var guide: GuideJump?
     @State private var showingMilestones = false
+    @State private var showingLockerCode = false
 
     init(store: Store) {
         self.store = store
@@ -74,12 +75,16 @@ struct HomeScreen: View {
             }
             TripBar(title: trip == nil ? "Start trip · \(walk.left)" : "Back to the trip",
                     systemImage: "cart", action: startTrip) {
+                Button { showingLockerCode = true } label: { Image(systemName: "lock") }
+                    .buttonStyle(.sk1Key())
+                    .accessibilityLabel("Locker code: add a pharmacy locker pickup")
                 ShareKey(store: store)
             }
         }
         .padding(.top, 4)
         .sheet(item: $guide) { GuideSheet(startAt: $0.id) }
         .sheet(isPresented: $showingMilestones) { MilestonesSheet(store: store) }
+        .sheet(isPresented: $showingLockerCode) { LockerCodeSheet(store: store) }
         .onAppear {
             guard Launch.isDemo else { return }
             if Launch.demoScreen == "stores" { navigator.choosingStore = true }
