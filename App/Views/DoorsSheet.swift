@@ -97,11 +97,12 @@ struct DoorsSheet: View {
         }
         .confirmationDialog("Put the zones in walking order from this entrance to this exit?",
                             isPresented: $confirmingOrder, titleVisibility: .visible) {
-            Button("Order zones") { save(orderingZones: true) }
+            Button("Order zones") { save(orderingZones: true, forgettingTrips: true) }
+            Button("Order zones, keep what trips learned") { save(orderingZones: true, forgettingTrips: false) }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The shortest walk through the departments on the map. Where your trips found things still comes "
-                 + "first; drag a thing on the list to put it right.")
+            Text("The shortest walk through the departments on the map, from IN to OUT. The order your trips learned "
+                 + "would still come first, so Order zones starts it fresh: the next trips learn it again from here.")
         }
         .task {
             // The demo's screenshot shows the exit being set.
@@ -111,18 +112,19 @@ struct DoorsSheet: View {
 
     private var hint: String {
         let order = drawing.isFloorPlan
-            ? " Order zones then walks the departments from one to the other; your trips refine it." : ""
+            ? " Order zones then puts the zones in walking order from IN to OUT, and the next trips refine it." : ""
         return "Tap Entrance, then the map where you come in; then Exit, and where you go out. The walk on the Map "
             + "starts at IN." + order
     }
 
-    private func save(orderingZones: Bool) {
+    private func save(orderingZones: Bool, forgettingTrips: Bool = false) {
         // The plan's own doors aren't stored, so a later fix to the plan reaches the store.
         let isOwn = entrance == drawing.base.entrance && exit == drawing.base.exit
         service.setDoors(of: store, entrance: isOwn ? nil : entrance, exit: isOwn ? nil : exit)
         if orderingZones {
             let plan = drawing.plan.withDoors(entrance: entrance, exit: exit)
             service.orderZones(of: store, as: plan.walkingOrder(of: zones.map(\.displayName)))
+            if forgettingTrips { service.forgetLearnedOrder(of: store) }
         }
         do {
             try service.save()
