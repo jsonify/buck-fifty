@@ -253,8 +253,9 @@ enum Guide {
                 + "code, so it's there when you shop.",
             points: [
                 "Apps can't read texts, so Shortcuts hands it over. In the Shortcuts app: Automation, New, Message; "
-                    + "Sender is the pharmacy's number, Message Contains \"locker\"; Run Immediately. The action is "
-                    + "Save locker code from Buck Fifty, with the Message.",
+                    + "Message Contains \"Pickup Code\" (and Sender, if you like, the number the texts come from, "
+                    + "at the top of the conversation in Messages, not the pharmacy's phone line); Run Immediately. "
+                    + "The action is Save locker code from Buck Fifty, with the Message.",
                 "Each text puts Pharmacy locker pickup on the Costco list, in the Pharmacy lockers zone, with the "
                     + "code, who it's for and the last day to pick it up. Two orders waiting share one row; the same "
                     + "text twice changes nothing.",
