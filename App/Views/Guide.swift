@@ -248,6 +248,20 @@ enum Guide {
                          does: "On the You tab: pins the store where you are now."),
             ]),
         GuidePart(
+            id: "lockers", title: "Pharmacy lockers", systemImage: "lock",
+            summary: "When the pharmacy texts a locker pickup, the pickup goes on the list at the lockers with its "
+                + "code, so it's there when you shop.",
+            points: [
+                "Apps can't read texts, so Shortcuts hands it over. In the Shortcuts app: Automation, New, Message; "
+                    + "Sender is the pharmacy's number, Message Contains \"locker\"; Run Immediately. The action is "
+                    + "Save locker code from Buck Fifty, with the Message.",
+                "Each text puts Pharmacy locker pickup on the Costco list, in the Pharmacy lockers zone, with the "
+                    + "code, who it's for and the last day to pick it up. Two orders waiting share one row; the same "
+                    + "text twice changes nothing.",
+                "Or copy the text and paste it into Add on Home or the list.",
+                "Check it off when you've got it, like anything else.",
+            ]),
+        GuidePart(
             id: "map", title: "Map the store", systemImage: "map",
             summary: "Experimental, and off until you turn it on: your steps and the compass trace your walk, and every "
                 + "check-off becomes a point on a floor plan.",

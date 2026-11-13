@@ -61,6 +61,25 @@ final class ListServiceTests: XCTestCase {
         XCTAssertTrue(food.learned.recent.isEmpty)
     }
 
+    func testLockerPickupGoesToTheLockers() throws {
+        let store = service.createStore(named: "Costco Aurora Village", now: t0)
+        let other = service.createStore(named: "Trader Joe's", now: t0)
+        XCTAssertEqual(service.lockerStore(among: [other, store]), store)
+        let pickup = LockerPickup(code: "AVQHTH", name: "Alise", days: 5)
+        let entry = try XCTUnwrap(service.addLockerPickup(pickup, to: store, by: jason, now: t0))
+        XCTAssertEqual(entry.displayName, LockerPickup.itemName)
+        XCTAssertEqual(entry.item?.storeZone?.displayName, "Pharmacy lockers")
+        XCTAssertTrue(entry.note?.hasPrefix("Code AVQHTH · Alise") == true)
+
+        // The same text again changes nothing; a second order joins the same entry.
+        XCTAssertEqual(service.addLockerPickup(pickup, to: store, by: jason, now: t0), entry)
+        XCTAssertEqual(entry.quantity, 1)
+        service.addLockerPickup(LockerPickup(code: "ZZ9Q", name: "Jason"), to: store, by: jason, now: t0)
+        XCTAssertEqual(entry.quantity, 2)
+        XCTAssertTrue(entry.note?.contains("Code AVQHTH") == true)
+        XCTAssertTrue(entry.note?.hasSuffix("Code ZZ9Q · Jason") == true)
+    }
+
     func testAddingRemembersItemsAndMergesRepeats() throws {
         let store = try makeCostco()
         let first = try XCTUnwrap(service.addToList("  Olive   oil ", store: store, by: jason))
