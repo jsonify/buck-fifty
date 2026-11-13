@@ -77,6 +77,17 @@ public struct ListService {
         }
     }
 
+    /// Forgets where trips (and drags on the list) found the store's things, so the list goes by the zones' walking
+    /// order again until the next trips teach it. Whether things wander, their zones and their history stay.
+    public func forgetLearnedOrder(of store: Store) {
+        for item in store.items ?? [] {
+            item.learnedPosition = nil
+            item.learnedTimePosition = nil
+            item.positionSampleCount = 0
+            item.recentPositions = nil
+        }
+    }
+
     /// Sets where you come in and go out on the store's map (fractions of it); nil puts one back to the plan's own.
     public func setDoors(of store: Store, entrance: PlanPoint?, exit: PlanPoint?) {
         let entrance = entrance?.clamped, exit = exit?.clamped

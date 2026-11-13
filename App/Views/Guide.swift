@@ -124,7 +124,8 @@ enum Guide {
                 "IN is where you come in and OUT where you go out (one IN · OUT tag when it's the same doors). If "
                     + "they're not where your store has them, tap the map or the door key, then tap the entrance and "
                     + "the exit. With a floor plan, Order zones then puts the zones in the order a short walk from IN "
-                    + "to OUT reaches them; what your trips learned still comes first.",
+                    + "to OUT reaches them, and starts the learned order fresh so the new order shows at once (or keep "
+                    + "what your trips learned, which still comes first).",
                 "Each zone with something left has a pin: the walk number of the first thing there, the same number "
                     + "as on the list, with how many things are there when it's more than one. Under the map, the stops "
                     + "still to do and what's at them: tap one to check it off.",

@@ -51,6 +51,14 @@ final class ListServiceTests: XCTestCase {
         let reversed = Array(DefaultZones.costco.reversed())
         service.orderZones(of: store, as: Array(reversed.prefix(3)))
         XCTAssertEqual(store.sortedZones.map(\.displayName), Array(reversed.prefix(3)) + DefaultZones.costco.prefix(6))
+
+        let food = try XCTUnwrap(service.addToList("Dog food", store: store, by: jason)?.item)
+        service.place([food: 0.05], moved: food)
+        XCTAssertNotNil(food.learnedPosition)
+        service.forgetLearnedOrder(of: store)
+        XCTAssertNil(food.learnedPosition)
+        XCTAssertEqual(food.positionSampleCount, 0)
+        XCTAssertTrue(food.learned.recent.isEmpty)
     }
 
     func testAddingRemembersItemsAndMergesRepeats() throws {
