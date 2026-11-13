@@ -194,25 +194,29 @@ struct TripLCD: View {
 struct AddBar: View {
     @Binding var draft: String
     let prompt: String
+    /// Whether the field has the keyboard. The screen owns it, so adding from its suggestions can put the keyboard
+    /// away too.
+    var typing: FocusState<Bool>.Binding
     let add: () -> Void
-    /// The field keeps the keyboard after Return, so a list can be typed one thing after another.
-    @FocusState private var typing: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             SKTextField("Add an item", text: $draft, prompt: prompt)
                 .textInputAutocapitalization(.sentences)
-                .submitLabel(.next)
-                .focused($typing)
-                .onSubmit {
-                    add()
-                    typing = true
-                }
-            Button(action: add) { Image(systemName: "plus") }
+                .submitLabel(.done)
+                .focused(typing)
+                .onSubmit(addAndPutAway)
+            Button(action: addAndPutAway) { Image(systemName: "plus") }
                 .buttonStyle(.sk1Key())
                 .accessibilityLabel("Add")
                 .disabled(ItemName.cleaned(draft).isEmpty)
         }
+    }
+
+    /// Adds what's typed and puts the keyboard away, so the list is in full view again.
+    private func addAndPutAway() {
+        add()
+        typing.wrappedValue = false
     }
 }
 

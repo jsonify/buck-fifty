@@ -95,12 +95,17 @@ public struct RouteLearning: Sendable, Equatable {
 
     /// Where in the trip each item was grabbed, by rank: the k-th of n usable check-offs is at k / (n − 1), so a long
     /// chat in the bakery doesn't skew anything. Empty for a trip with fewer than two usable check-offs.
-    public func rankPositions<ID: Hashable>(_ stops: [RouteStop<ID>]) -> [ID: Double] {
+    ///
+    /// `notReached` is for a trip cut short (it went quiet, nobody tapped Done): its last check-off wasn't the checkout,
+    /// and the things still on the list were presumably further on. They count as stops after the last check-off, so
+    /// the k-th is at k / (n − 1 + notReached) and the front of the store isn't stretched over the whole walk.
+    public func rankPositions<ID: Hashable>(_ stops: [RouteStop<ID>], notReached: Int = 0) -> [ID: Double] {
         let usable = usableStops(stops)
         guard usable.count >= 2 else { return [:] }
+        let span = Double(usable.count - 1 + max(notReached, 0))
         var positions: [ID: Double] = [:]
         for (rank, stop) in usable.enumerated() {
-            positions[stop.item] = Double(rank) / Double(usable.count - 1)
+            positions[stop.item] = Double(rank) / span
         }
         return positions
     }

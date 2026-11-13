@@ -72,7 +72,7 @@ enum Guide {
                 "Select from inventory opens everything you've bought here before: what you buy most, what's running "
                     + "low, the last trip, or A to Z, with a find field. Tap all the things you need, then Add to list "
                     + "puts them on together. Things already on your list say ON LIST and can't be picked again.",
-                "Type in the field to add something new; Return adds it and leaves the keyboard up for the next one. "
+                "Type in the field to add something new; Done (or +) adds it and puts the keyboard away. "
                     + "Things the store remembers come up as you type: tap one to add it. Adding something that's "
                     + "already on the list adds one more (×2).",
                 "At home the list is in your order, with no check marks. Tap a thing to change its name, zone, how "
@@ -184,7 +184,8 @@ enum Guide {
                 "Done ends the trip: what you got comes off the list (the store still remembers it, in the "
                     + "inventory). What wasn't there, and anything you didn't check off, stays on the list for next "
                     + "time. Leave the store with Trips by location on and it's done for you.",
-                "A trip with no check-offs for 45 minutes ends by itself.",
+                "A trip with no check-offs for 45 minutes ends by itself. It didn't reach the checkout, so it "
+                    + "teaches only how far you got: what's still on the list stays further on.",
                 "Each person has their own trip, so two people splitting up don't mix their routes.",
             ]),
         GuidePart(
@@ -238,8 +239,11 @@ enum Guide {
             points: [
                 "Each store is a circle on the map, pinned where you stand when you tap Pin here on the You tab, or "
                     + "the first time you tap Start trip there with this on.",
-                "Arriving starts a trip if there's something on the list. Leaving the circle ends it, the same as "
-                    + "Done: what you checked off comes off the list. A trip with nothing checked off is forgotten.",
+                "Arriving starts a trip if there's something on the list. Staying out of the circle for 10 minutes "
+                    + "ends it, the same as Done: what you checked off comes off the list. A trip with nothing checked "
+                    + "off is forgotten.",
+                "Back inside sooner, and the trip carries on: in a big store the phone's location can wander past "
+                    + "the edge, and that doesn't end the trip you're in.",
                 "The radius (100, 200 or 400 m) takes in the car park, so the trip ends as you drive away, not at "
                     + "the door. A big store in a wide car park wants 400.",
                 "It works with the app closed when Location is set to Always. Pins stay on this phone, and so does "

@@ -23,6 +23,8 @@ struct HomeScreen: View {
     // Fetched so the week and the last month redraw when any trip changes, here or on the other phone.
     @FetchRequest(fetchRequest: Fetch.trips()) private var trips: FetchedResults<Trip>
     @State private var draft = ""
+    /// Whether the add field has the keyboard: adding puts it away.
+    @FocusState private var typing: Bool
     @State private var guide: GuideJump?
     @State private var showingMilestones = false
     @State private var showingLockerCode = false
@@ -51,7 +53,7 @@ struct HomeScreen: View {
                          chooseStore: { navigator.choosingStore = true }) {
                 StorePresencePill(store: store, openTrips: Array(openTrips))
             }
-            AddBar(draft: $draft, prompt: "Add to \(store.displayName)…", add: add)
+            AddBar(draft: $draft, prompt: "Add to \(store.displayName)…", typing: $typing, add: add)
                 .padding(.horizontal, 14)
             ScrollViewReader { proxy in
                 ScrollView {

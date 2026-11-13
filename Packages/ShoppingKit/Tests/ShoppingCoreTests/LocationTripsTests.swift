@@ -14,9 +14,41 @@ final class LocationTripsTests: XCTestCase {
         XCTAssertEqual(LocationTrips.action(for: .arrived, hasOpenTrip: true, itemsLeft: 3), .nothing)
     }
 
-    func testLeavingEndsTheTrip() {
-        XCTAssertEqual(LocationTrips.action(for: .left, hasOpenTrip: true, itemsLeft: 2), .endTrip)
+    func testLeavingStartsTheLeaveGrace() {
+        XCTAssertEqual(LocationTrips.action(for: .left, hasOpenTrip: true, itemsLeft: 2), .leaving)
         XCTAssertEqual(LocationTrips.action(for: .left, hasOpenTrip: false, itemsLeft: 2), .nothing)
+    }
+
+    func testALeaveIsDueOnlyAfterTheGrace() {
+        let out = Date(timeIntervalSince1970: 1_000_000)
+        var leaves = PendingLeaves()
+        leaves.left("costco", at: out)
+        XCTAssertTrue(leaves.due(now: out.addingTimeInterval(LocationTrips.leaveGrace - 1)).isEmpty)
+        XCTAssertEqual(leaves.due(now: out.addingTimeInterval(LocationTrips.leaveGrace)), ["costco": out])
+    }
+
+    func testComingBackInCancelsTheLeave() {
+        // The phone's location wandered out of the circle at the back of a big store, then back in.
+        let out = Date(timeIntervalSince1970: 1_000_000)
+        var leaves = PendingLeaves()
+        leaves.left("costco", at: out)
+        leaves.cancel("costco")
+        XCTAssertTrue(leaves.due(now: out.addingTimeInterval(LocationTrips.leaveGrace * 3)).isEmpty)
+    }
+
+    func testASecondLeaveKeepsTheFirstTime() {
+        let out = Date(timeIntervalSince1970: 1_000_000)
+        var leaves = PendingLeaves()
+        leaves.left("costco", at: out)
+        leaves.left("costco", at: out.addingTimeInterval(120))
+        XCTAssertEqual(leaves.leftAt["costco"], out)
+    }
+
+    func testLeavesRoundTrip() {
+        var leaves = PendingLeaves()
+        leaves.left("a", at: Date(timeIntervalSince1970: 1_000_000))
+        XCTAssertEqual(PendingLeaves.decode(PendingLeaves.encode(leaves)), leaves)
+        XCTAssertEqual(PendingLeaves.decode(Data("nope".utf8)), PendingLeaves())
     }
 
     func testPinsRoundTrip() {

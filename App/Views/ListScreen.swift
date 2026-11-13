@@ -41,6 +41,8 @@ struct ListScreen: View {
     @FetchRequest private var items: FetchedResults<Item>
     @FetchRequest private var openTrips: FetchedResults<Trip>
     @State private var draft = ""
+    /// Whether the add field has the keyboard: adding anything puts it away.
+    @FocusState private var typing: Bool
     @State private var editing: Editing?
     @State private var showingZones = false
     @State private var showingFloorPlan = false
@@ -75,7 +77,7 @@ struct ListScreen: View {
             }
             walk.lcd(trip: trip, store: store, now: Date())
                 .padding(.horizontal, 14)
-            AddBar(draft: $draft, prompt: "Add to \(store.displayName)…") { add(draft) }
+            AddBar(draft: $draft, prompt: "Add to \(store.displayName)…", typing: $typing) { add(draft) }
                 .padding(.horizontal, 14)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -275,11 +277,13 @@ struct ListScreen: View {
             service.addLockerPickup(pickup, to: store, by: profile.shopper)
             actions.save()
             draft = ""
+            typing = false
             return
         }
         guard service.addToList(name, store: store, by: profile.shopper) != nil else { return }
         actions.save()
         draft = ""
+        typing = false
         // The zone is guessed in the background: adding never waits for it.
         ZoneGuessing.guessMissing(in: store, context: context)
     }

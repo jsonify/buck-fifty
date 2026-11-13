@@ -385,6 +385,13 @@ final class RouteLearningTests: XCTestCase {
         XCTAssertEqual(p, ["a": 0, "b": 0.25, "c": 0.5, "d": 0.75, "e": 1])
     }
 
+    func testATripCutShortDoesNotStretchToTheCheckout() {
+        // Got a and b, then the trip went quiet with three things still on the list, further on.
+        let p = learning.rankPositions(trip(["a", "b"]), notReached: 3)
+        XCTAssertEqual(p["a"], 0)
+        XCTAssertEqual(p["b"] ?? -1, 0.25, accuracy: 1e-9)
+    }
+
     func testRankIgnoresLongPausesButTimeDoesNot() {
         // Ten minutes chatting in the bakery between b and c.
         let stops = [RouteStop(item: "a", time: t0), RouteStop(item: "b", time: t0.addingTimeInterval(60)),

@@ -125,10 +125,10 @@ struct TripActions {
     }
 
     /// Ends your trip; says whether anything was bought (then Everything opens for the review).
-    func finish(_ trip: Trip?) -> Bool {
+    func finish(_ trip: Trip?, at date: Date = Date()) -> Bool {
         let bought = trip.map { service.route(of: $0).count } ?? 0
         if let trip, mapper.isRecording(trip) { finishMapping(trip, atCheckout: true) }
-        service.finishTrip(at: store, for: profile.shopper)
+        service.finishTrip(at: store, for: profile.shopper, now: date)
         save()
         return bought > 0
     }
@@ -159,6 +159,7 @@ struct TripActions {
     /// Ends trips that went quiet. A mapped trip that went quiet ended away from the checkout: keep its walk,
     /// uncorrected at the end.
     func endLapsedTrips() {
+        if !Launch.isDemo { StoreFence.shared.settleLeaves() }
         _ = service.currentTrip(at: store, for: profile.shopper)
         if let mapped = mapper.trip, mapped.endedAt != nil, mapped.store == store {
             finishMapping(mapped, atCheckout: false)
