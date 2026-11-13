@@ -72,7 +72,7 @@ enum Guide {
                 "Select from inventory opens everything you've bought here before: what you buy most, what's running "
                     + "low, the last trip, or A to Z, with a find field. Tap all the things you need, then Add to list "
                     + "puts them on together. Things already on your list say ON LIST and can't be picked again.",
-                "Type in the field to add something new; Return adds it and leaves the keyboard up for the next one. "
+                "Type in the field to add something new; Done (or +) adds it and puts the keyboard away. "
                     + "Things the store remembers come up as you type: tap one to add it. Adding something that's "
                     + "already on the list adds one more (×2).",
                 "At home the list is in your order, with no check marks. Tap a thing to change its name, zone, how "
