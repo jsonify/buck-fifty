@@ -225,6 +225,19 @@ final class ListServiceTests: XCTestCase {
         XCTAssertEqual(listOrder(store), walked)
     }
 
+    func testATripThatWentQuietTeachesOnlyHowFarItGot() throws {
+        let store = try makeCostco()
+        let eggs = try XCTUnwrap(service.addToList("Eggs", store: store, by: jason, now: t0))
+        let coffee = try XCTUnwrap(service.addToList("Coffee", store: store, by: jason, now: t0))
+        for name in ["Milk", "Bread"] { service.addToList(name, store: store, by: jason, now: t0) }
+        service.setChecked(eggs, true, by: jason, now: t0)
+        service.setChecked(coffee, true, by: jason, now: t0.addingTimeInterval(60))
+        // Nobody tapped Done: the trip goes quiet with Milk and Bread still on the list.
+        XCTAssertNil(service.currentTrip(at: store, for: jason, now: t0.addingTimeInterval(60 * 60)))
+        let learned = try XCTUnwrap(service.item(named: "Coffee", in: store)?.learnedPosition?.doubleValue)
+        XCTAssertEqual(learned, 1.0 / 3, accuracy: 1e-9)
+    }
+
     func testATripTeachesOnlyOnce() throws {
         let store = try makeCostco()
         try walk(["Eggs", "Coffee"], in: store, start: t0)

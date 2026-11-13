@@ -184,7 +184,8 @@ enum Guide {
                 "Done ends the trip: what you got comes off the list (the store still remembers it, in the "
                     + "inventory). What wasn't there, and anything you didn't check off, stays on the list for next "
                     + "time. Leave the store with Trips by location on and it's done for you.",
-                "A trip with no check-offs for 45 minutes ends by itself.",
+                "A trip with no check-offs for 45 minutes ends by itself. It didn't reach the checkout, so it "
+                    + "teaches only how far you got: what's still on the list stays further on.",
                 "Each person has their own trip, so two people splitting up don't mix their routes.",
             ]),
         GuidePart(

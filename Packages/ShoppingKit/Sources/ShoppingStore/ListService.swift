@@ -459,16 +459,17 @@ public struct ListService {
 
     /// Learns the store's order from the trip's route: each item checked off on it moves toward where in the trip it
     /// was grabbed. A trip teaches once (ending a trip does this); a trip with fewer than two check-offs that count
-    /// teaches nothing. Returns how many items learned something.
+    /// teaches nothing. Returns how many items learned something. `notReached` is how many things were still on the
+    /// list when a trip was cut short (see `RouteLearning.rankPositions`).
     @discardableResult
-    public func learn(from trip: Trip, now: Date = Date()) -> Int {
+    public func learn(from trip: Trip, notReached: Int = 0, now: Date = Date()) -> Int {
         guard trip.learnedAt == nil else { return 0 }
         trip.learnedAt = trip.endedAt ?? now
         let stops = route(of: trip).compactMap { checkOff -> RouteStop<Item>? in
             guard let item = checkOff.item, !item.isDeleted, let time = checkOff.timestamp else { return nil }
             return RouteStop(item: item, time: time)
         }
-        let byRank = learning.rankPositions(stops)
+        let byRank = learning.rankPositions(stops, notReached: notReached)
         let byTime = learning.timePositions(stops)
         for (item, sample) in byRank {
             let next = learning.updated(item.learned, with: sample)
@@ -530,13 +531,15 @@ public struct ListService {
     private func endLapsedTrips(at store: Store, now: Date) {
         for trip in openTrips(at: store) {
             let last = trip.lastActivityAt ?? trip.startedAt ?? now
-            if policy.hasLapsed(lastActivity: last, now: now) { end(trip, at: last) }
+            if policy.hasLapsed(lastActivity: last, now: now) { end(trip, at: last, cutShort: true) }
         }
     }
 
-    private func end(_ trip: Trip, at date: Date) {
+    /// Ends a trip. One `cutShort` (it went quiet) didn't reach the checkout: what's still on the list is further on.
+    private func end(_ trip: Trip, at date: Date, cutShort: Bool = false) {
         trip.endedAt = date
-        learn(from: trip, now: date)
+        let notReached = cutShort ? (trip.store?.entries.filter { !$0.isChecked && !$0.isDeleted }.count ?? 0) : 0
+        learn(from: trip, notReached: notReached, now: date)
         guard let store = trip.store, let shopperID = trip.shopperID else { return }
         for entry in store.entries where entry.isChecked && entry.checkedByID == shopperID {
             context.delete(entry)
