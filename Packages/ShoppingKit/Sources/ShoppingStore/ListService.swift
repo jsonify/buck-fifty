@@ -185,6 +185,44 @@ public struct ListService {
         return entry
     }
 
+    // MARK: Pharmacy locker pickups
+
+    /// The store a pharmacy locker pickup goes to: a Costco with a lockers zone, else any Costco, else any store with a
+    /// lockers zone, else the first store.
+    public func lockerStore(among stores: [Store]) -> Store? {
+        let costcos = stores.filter { ItemName.normalized($0.displayName).contains("costco") }
+        return costcos.first { lockerZone(in: $0) != nil } ?? costcos.first
+            ?? stores.first { lockerZone(in: $0) != nil } ?? stores.first
+    }
+
+    /// The store's pharmacy lockers zone: one named for the lockers, else for the pharmacy.
+    public func lockerZone(in store: Store) -> Zone? {
+        let zones = store.sortedZones
+        return zones.first { ItemName.normalized($0.displayName).contains("locker") }
+            ?? zones.first { ItemName.normalized($0.displayName).contains("pharmacy") }
+    }
+
+    /// Puts a locker pickup on the store's list, at the lockers, with its code in the note. A second order waiting at
+    /// the same time joins the same entry (its code added to the note); the same text twice changes nothing.
+    @discardableResult
+    public func addLockerPickup(_ pickup: LockerPickup, to store: Store, by shopper: Shopper,
+                                now: Date = Date()) -> ListEntry? {
+        let note = pickup.note(receivedAt: now)
+        let open = item(named: LockerPickup.itemName, in: store)?.entries?
+            .first { !$0.isChecked && !$0.isDeleted }
+        if let open, (open.note ?? "").contains("Code \(pickup.code)") { return open }
+        guard let entry = addToList(LockerPickup.itemName, store: store, by: shopper, now: now),
+              let item = entry.item else { return nil }
+        if let earlier = open?.note, !earlier.isEmpty {
+            entry.note = earlier + "; " + note
+        } else {
+            entry.note = note
+            entry.quantity = 1
+        }
+        if item.storeZone == nil, let zone = lockerZone(in: store) { setZone(zone, for: item) }
+        return entry
+    }
+
     /// Sets an item's zone by hand (including "no zone"). A zone set by hand is never replaced by a guess.
     public func setZone(_ zone: Zone?, for item: Item) {
         item.storeZone = zone

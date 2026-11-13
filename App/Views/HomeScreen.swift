@@ -265,6 +265,13 @@ struct HomeScreen: View {
     // MARK: Actions
 
     private func add() {
+        // A pharmacy locker text pasted in: the pickup, with its code, at the lockers.
+        if let pickup = LockerPickup.parse(draft) {
+            service.addLockerPickup(pickup, to: store, by: profile.shopper)
+            actions.save()
+            draft = ""
+            return
+        }
         guard service.addToList(draft, store: store, by: profile.shopper) != nil else { return }
         actions.save()
         draft = ""
