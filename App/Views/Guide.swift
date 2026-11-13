@@ -43,7 +43,9 @@ enum Guide {
                     + "is this week: a filled cell for each day you shopped, NEXT on the day you'll probably go.",
                 "Your list is the same as on the List tab: Select from inventory to pick what you need, type to add "
                     + "something new, tap a thing to change it, the trash to take it off, and hold and drag to "
-                    + "reorder. Nothing here starts a trip.",
+                    + "reorder. Clear takes everything off at once. Nothing here starts a trip.",
+                "The list keeps whatever you didn't get last time, so it isn't empty after a trip. Clear it to start "
+                    + "fresh; everything stays in the inventory.",
                 "Due before the next trip: a card for each thing you'll run out of. Add puts it on the list; Add all "
                     + "does them all.",
                 "New at says when Buck Fifty has learned enough to switch something on. Coming up shows what it "
@@ -67,7 +69,7 @@ enum Guide {
             points: [
                 "Select from inventory opens everything you've bought here before: what you buy most, what's running "
                     + "low, the last trip, or A to Z, with a find field. Tap all the things you need, then Add to list "
-                    + "puts them on together.",
+                    + "puts them on together. Things already on your list say ON LIST and can't be picked again.",
                 "Type in the field to add something new; Return adds it and leaves the keyboard up for the next one. "
                     + "Things the store remembers come up as you type: tap one to add it. Adding something that's "
                     + "already on the list adds one more (×2).",
@@ -91,6 +93,8 @@ enum Guide {
                          does: "Everything you've bought here before: tap what you need, then Add to list."),
                 GuideKey(systemImage: "trash", name: "Trash",
                          does: "Takes a thing off the list."),
+                GuideKey(systemImage: "xmark.bin", name: "Clear",
+                         does: "At home: takes everything off the list, after asking. It all stays in the inventory."),
                 GuideKey(systemImage: "circle", name: "Got it",
                          does: "In the store: checks it off, struck through. Tap again to undo."),
                 GuideKey(systemImage: "arrow.uturn.forward", name: "Not here",

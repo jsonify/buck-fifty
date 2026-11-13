@@ -56,6 +56,26 @@ final class HomeListingTests: XCTestCase {
         XCTAssertEqual(PastItems.filtered(past, by: .usual).map(\.name), ["Milk", "Eggs"])
     }
 
+    func testClearingTheListFreesEverythingToPickAgain() throws {
+        let store = service.createStore(named: "Costco", now: t0)
+        for name in ["Milk", "Eggs", "Bread"] {
+            if let entry = service.addToList(name, store: store, by: jason, now: t0) {
+                service.setChecked(entry, true, by: jason, now: t0)
+            }
+        }
+        service.finishTrip(at: store, for: jason, now: t0.addingTimeInterval(60))
+        for name in ["Milk", "Eggs", "Bread"] { service.addToList(name, store: store, by: jason, now: t0) }
+        try service.save()
+        XCTAssertTrue(service.pastItems(in: store, now: t0).allSatisfy(\.isOnList))
+
+        XCTAssertEqual(service.dropLeftovers(in: store), 3)
+        try service.save()
+        XCTAssertTrue(service.homeList(in: store).isEmpty)
+        let past = service.pastItems(in: store, now: t0)
+        XCTAssertEqual(past.count, 3)
+        XCTAssertFalse(past.contains(where: \.isOnList))
+    }
+
     func testWhatATripDidntGetCanBeDropped() throws {
         let store = service.createStore(named: "Costco", now: t0)
         let milk = try XCTUnwrap(service.addToList("Milk", store: store, by: jason, now: t0))

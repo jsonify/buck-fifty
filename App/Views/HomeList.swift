@@ -5,9 +5,10 @@ import SK1UI
 import ShoppingCore
 import ShoppingStore
 
-/// The list before the trip, on Home and the List tab: Select from inventory over it, then one card in your own order
-/// (`HomeOrder`). No check marks: at home you only build the list. Tap a row to edit it, the trash takes it off, and
-/// holding one and dragging it onto another moves it there. Nothing here starts a trip; Start trip does, in the store.
+/// The list before the trip, on Home and the List tab: Select from inventory over it (and Clear, which empties the list
+/// after asking), then one card in your own order (`HomeOrder`). No check marks: at home you only build the list. Tap a
+/// row to edit it, the trash takes it off, and holding one and dragging it onto another moves it there. Nothing here
+/// starts a trip; Start trip does, in the store.
 struct HomeListEditor: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
@@ -18,6 +19,7 @@ struct HomeListEditor: View {
     @State private var editing: Editing?
     @State private var showingInventory = false
     @State private var dropTarget: NSManagedObjectID?
+    @State private var confirmingClear = false
 
     init(store: Store) {
         self.store = store
@@ -31,12 +33,22 @@ struct HomeListEditor: View {
     var body: some View {
         let list = HomeOrder.sorted(Array(entries))
         VStack(alignment: .leading, spacing: 12) {
-            Button { showingInventory = true } label: {
-                Label("Select from inventory", systemImage: "checklist")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 10) {
+                Button { showingInventory = true } label: {
+                    Label("Select from inventory", systemImage: "checklist")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.sk1Key())
+                .accessibilityHint("Everything you've bought here before: tap the things you need, then Add to list")
+                if !list.isEmpty {
+                    Button { confirmingClear = true } label: {
+                        Label("Clear", systemImage: "xmark.bin")
+                    }
+                    .buttonStyle(.sk1Key())
+                    .accessibilityLabel("Clear the list")
+                    .accessibilityHint("Takes everything off the list; it all stays in the inventory")
+                }
             }
-            .buttonStyle(.sk1Key())
-            .accessibilityHint("Everything you've bought here before: tap the things you need, then Add to list")
             if list.isEmpty {
                 Text("A blank list. Tap Select from inventory and pick what you need, or type above to add something "
                      + "new.")
@@ -60,6 +72,12 @@ struct HomeListEditor: View {
         }
         .sheet(item: $editing) { EditEntrySheet(entry: $0.entry, zones: Array(zones)) }
         .sheet(isPresented: $showingInventory) { PastItemsSheet(store: store) }
+        .confirmationDialog(clearTitle(list.count), isPresented: $confirmingClear, titleVisibility: .visible) {
+            Button("Clear the list", role: .destructive, action: clear)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Everything you've bought before stays in the inventory, to pick again.")
+        }
         .onAppear {
             guard Launch.isDemo, Launch.demoScreen == "past", !showingInventory else { return }
             showingInventory = true
@@ -93,6 +111,16 @@ struct HomeListEditor: View {
             }
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func clearTitle(_ count: Int) -> String {
+        count == 1 ? "Take the 1 thing off the list?" : "Take all \(count) things off the list?"
+    }
+
+    /// Clear: everything not already in someone's cart comes off the list. The items stay remembered.
+    private func clear() {
+        service.dropLeftovers(in: store)
+        actions.save()
     }
 
     /// Moves the dragged entry (by its id) to `target`'s place in your own order.
