@@ -8,7 +8,8 @@ import ShoppingStore
 /// The inventory (Select from inventory, over the list at home): everything the store remembers, so a blank list can
 /// be built in a few taps. Usual (what you buy most, most first), Running low (what Restock says runs out before the
 /// next trip), Last trip, or everything A to Z; the find field narrows it. Tap the things you need to pick them (tap
-/// again to unpick), then Add to list puts them all on the list at once. What's already on the list says so.
+/// again to unpick), then Add to list puts them all on the list at once. What's already on the list says ON LIST and
+/// can't be picked again; the note over the list says so, and that Clear on the list empties it.
 struct PastItemsSheet: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
@@ -50,8 +51,10 @@ struct PastItemsSheet: View {
                     .sk1Hint()
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                SKGroup(caption: caption(shown.count),
-                        note: "Tap everything you need, then Add to list. Tap again to unpick.") {
+                Text(note(onList: shown.filter(\.isOnList).count))
+                    .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
+                SKGroup(caption: caption(shown.count)) {
                     ForEach(shown, id: \.ref.objectID) { past in
                         let isPicked = picked.contains(past.ref.objectID)
                         Button { pick(past.ref) } label: {
@@ -89,6 +92,16 @@ struct PastItemsSheet: View {
         case .lastTrip: return "Last trip · \(count)"
         case .alphabetical: return "A to Z · \(count)"
         }
+    }
+
+    /// Under the list: what this is, how to pick, and what ON LIST means when some are.
+    private func note(onList: Int) -> String {
+        var note = "Everything you've checked off at \(store.displayName) before. Tap what you need, then Add to list; "
+            + "tap again to unpick."
+        if onList > 0 {
+            note += " ON LIST: it's on your list already. Take it off there (or Clear the list) to pick it again."
+        }
+        return note
     }
 
     private var emptyNote: String {

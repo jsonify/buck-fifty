@@ -28,7 +28,8 @@ from check-offs (#3), on-device zone guesses (#4), dead reckoning (#5), shelf-ta
   red is Add and LATE.
 - **Build at home, shop in the store.** At home (Home and the List tab) the list is something you build: **Select
   from inventory** opens everything you've bought before, you tap all you need and **Add to list** puts them on
-  together. Rows have no check marks there: tap to edit, the trash to remove, drag to reorder. Only **Start trip**, in
+  together (what's already on the list says ON LIST). Rows have no check marks there: tap to edit, the trash to
+  remove, drag to reorder, and **Clear** empties the whole list after asking. Only **Start trip**, in
   the store, starts a trip: the list then sorts itself into a card per zone, in the order your trips reach them
   (`ShoppingCore/Walk.swift`). Each row has three buttons, explained over the list: the circle (got it, struck
   through), **Not here** (the store didn't have it: it moves to Not here at the bottom and stays on the list for next
