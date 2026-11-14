@@ -163,6 +163,8 @@ struct UrgencyTag: View {
         Text(text)
             .font(.system(size: 10, weight: .heavy))
             .tracking(0.8)
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
