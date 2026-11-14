@@ -32,6 +32,9 @@ struct RootView: View {
     @State private var showingTour = false
     /// The guide (only opened from here by the screenshot demo; You opens it otherwise).
     @State private var showingGuide = false
+    /// Bumped whenever the context changes, so the Restock badge follows a skip or a Don't suggest (an attribute
+    /// change, which @FetchRequest doesn't redraw for).
+    @State private var revision = 0
 
     /// Posted when another device's changes (or a newly accepted share) are merged in.
     private let remoteChanges = NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)
@@ -56,6 +59,7 @@ struct RootView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            let _ = revision
             AppTabBar(selection: $navigator.tab, badges: store.map { [.restock: dueCount(at: $0)] } ?? [:])
         }
         .sk1Chassis()
@@ -79,6 +83,8 @@ struct RootView: View {
         .fullScreenCover(isPresented: $showingTour) { TourSheet() }
         .sheet(isPresented: $showingGuide) { GuideSheet() }
         .onReceive(remoteChanges) { _ in sharing.refresh(Array(stores)) }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange,
+                                                       object: context)) { _ in revision &+= 1 }
         .onChange(of: stores.count) { sharing.refresh(Array(stores)) }
         .alert("Sharing", isPresented: Binding(get: { sharing.errorMessage != nil },
                                                 set: { if !$0 { sharing.errorMessage = nil } })) {
