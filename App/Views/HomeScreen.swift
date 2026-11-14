@@ -1,3 +1,4 @@
+import Combine
 import CoreData
 import SwiftUI
 import SK1Tokens
@@ -28,6 +29,9 @@ struct HomeScreen: View {
     @State private var guide: GuideJump?
     @State private var showingMilestones = false
     @State private var showingLockerCode = false
+    /// Bumped whenever the context changes. @FetchRequest redraws when objects come and go, not when an attribute of
+    /// one changes (skipping or muting what's due), so the body reads this to redraw then too.
+    @State private var revision = 0
 
     init(store: Store) {
         self.store = store
@@ -43,6 +47,7 @@ struct HomeScreen: View {
     private static let comingUpID = "comingUp"
 
     var body: some View {
+        let _ = revision
         let now = Date()
         let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items))
         let low = service.neededNotOnList(in: store, now: now)
@@ -88,6 +93,8 @@ struct HomeScreen: View {
         .sheet(item: $guide) { GuideSheet(startAt: $0.id) }
         .sheet(isPresented: $showingMilestones) { MilestonesSheet(store: store) }
         .sheet(isPresented: $showingLockerCode) { LockerCodeSheet(store: store) }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange,
+                                                       object: context)) { _ in revision &+= 1 }
         .onAppear {
             guard Launch.isDemo else { return }
             if Launch.demoScreen == "stores" { navigator.choosingStore = true }

@@ -1,3 +1,4 @@
+import Combine
 import CoreData
 import SwiftUI
 import SK1Tokens
@@ -15,6 +16,9 @@ struct RestockScreen: View {
     // Fetched so the checklist redraws when the list or a trip changes, here or on the other phone.
     @FetchRequest private var entries: FetchedResults<ListEntry>
     @FetchRequest private var openTrips: FetchedResults<Trip>
+    /// Bumped whenever the context changes. @FetchRequest redraws when objects come and go, not when an attribute of
+    /// one changes (skipping or muting what's due), so the body reads this to redraw then too.
+    @State private var revision = 0
 
     init(store: Store) {
         self.store = store
@@ -25,6 +29,7 @@ struct RestockScreen: View {
     private var service: ListService { ListService(context: context) }
 
     var body: some View {
+        let _ = revision
         let now = Date()
         let lines = service.restockLines(in: store, now: now)
         let needed = lines.filter { $0.isSuggested && !$0.isOnList }
@@ -68,6 +73,8 @@ struct RestockScreen: View {
         }
         .padding(.top, 4)
         .onAppear { profile.markTried(Milestones.Try.restock) }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange,
+                                                       object: context)) { _ in revision &+= 1 }
     }
 
     private func nextTripLabel(_ rhythm: ShoppingRhythm, now: Date) -> String {
