@@ -80,6 +80,15 @@ final class RestockTests: XCTestCase {
         XCTAssertEqual(Restock.shelf(urgency: .soon, isStaple: true), .soon)
         XCTAssertEqual(Restock.shelf(urgency: .later, isStaple: true), .staples)
         XCTAssertEqual(Restock.shelf(urgency: .unknown, isStaple: false), .rest)
+        XCTAssertEqual(Restock.shelf(urgency: .overdue, isStaple: true, muted: true), .rest)
+    }
+
+    func testSkipLastsUntilTheNextTripStarts() {
+        let skippedAt = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertFalse(Restock.isSkipped(skippedAt: nil, latestTrip: skippedAt))
+        XCTAssertTrue(Restock.isSkipped(skippedAt: skippedAt, latestTrip: nil))
+        XCTAssertTrue(Restock.isSkipped(skippedAt: skippedAt, latestTrip: skippedAt.addingTimeInterval(-60)))
+        XCTAssertFalse(Restock.isSkipped(skippedAt: skippedAt, latestTrip: skippedAt.addingTimeInterval(60)))
     }
 
     func testWords() {

@@ -195,13 +195,22 @@ public enum Restock {
         }
     }
 
-    /// Which section an item goes in.
-    public static func shelf(urgency: RestockUrgency, isStaple: Bool) -> Shelf {
+    /// Which section an item goes in. One you've said never to suggest goes with the rest, however due it is.
+    public static func shelf(urgency: RestockUrgency, isStaple: Bool, muted: Bool = false) -> Shelf {
+        if muted { return .rest }
         switch urgency {
         case .overdue, .due: return .needed
         case .soon: return .soon
         case .later, .unknown: return isStaple ? .staples : .rest
         }
+    }
+
+    /// Whether an item skipped for the next trip at `skippedAt` is still skipped: until a trip starts after the skip.
+    /// `latestTrip` is when the store's latest trip started.
+    public static func isSkipped(skippedAt: Date?, latestTrip: Date?) -> Bool {
+        guard let skippedAt else { return false }
+        guard let latestTrip else { return true }
+        return latestTrip <= skippedAt
     }
 
     /// Orders an item within its section: the most urgent first, then the most often bought, then by name.

@@ -24,7 +24,7 @@ extension ListService {
         let lastTrip = self.lastTrip(at: store).map { Set(items(boughtOn: $0)) } ?? []
         return restockLines(in: store, now: now, calendar: calendar).map { line in
             PastItem(ref: line.item, name: line.item.displayName, timesBought: line.estimate.timesBought,
-                     lastBought: line.estimate.lastBought, isRunningLow: line.urgency.isNeeded,
+                     lastBought: line.estimate.lastBought, isRunningLow: line.isSuggested,
                      boughtLastTrip: lastTrip.contains(line.item), isOnList: line.isOnList)
         }
     }
