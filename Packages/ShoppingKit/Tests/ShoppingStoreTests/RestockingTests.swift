@@ -70,6 +70,67 @@ final class RestockingTests: XCTestCase {
         XCTAssertEqual(store.remainingCount, 2)
     }
 
+    func testSkipForNextTripAndBringBack() throws {
+        let store = service.createStore(named: "Costco", now: now)
+        shop(["Milk", "Eggs"], daysAgo: 14, at: store)
+        shop(["Milk", "Eggs"], daysAgo: 7, at: store)
+        try service.save()
+        let milk = try XCTUnwrap(service.item(named: "milk", in: store))
+
+        service.skipForNextTrip([milk], now: now)
+        XCTAssertEqual(service.neededNotOnList(in: store, now: now, calendar: calendar).map(\.item.displayName),
+                       ["Eggs"])
+        XCTAssertEqual(service.skippedNotOnList(in: store, now: now, calendar: calendar).map(\.item.displayName),
+                       ["Milk"])
+        XCTAssertEqual(service.addNeeded(in: store, by: jason, now: now, calendar: calendar), 1)
+        XCTAssertFalse(service.isOnList(milk))
+
+        service.unskip(in: store)
+        XCTAssertEqual(service.neededNotOnList(in: store, now: now, calendar: calendar).map(\.item.displayName),
+                       ["Milk"])
+        XCTAssertTrue(service.skippedNotOnList(in: store, now: now, calendar: calendar).isEmpty)
+    }
+
+    func testSkipEndsWithTheNextTrip() throws {
+        let store = service.createStore(named: "Costco", now: now)
+        shop(["Milk", "Bread"], daysAgo: 14, at: store)
+        shop(["Milk", "Bread"], daysAgo: 7, at: store)
+        try service.save()
+        let milk = try XCTUnwrap(service.item(named: "milk", in: store))
+        service.skipForNextTrip([milk], now: now.addingTimeInterval(-2 * day))
+
+        // A trip after the skip that didn't buy milk: it's due again.
+        shop(["Bread"], daysAgo: 1, at: store)
+        try service.save()
+        let line = try XCTUnwrap(service.restockLines(in: store, now: now, calendar: calendar)
+            .first { $0.item == milk })
+        XCTAssertFalse(line.isSkipped)
+        XCTAssertTrue(line.isSuggested)
+    }
+
+    func testDontSuggest() throws {
+        let store = service.createStore(named: "Costco", now: now)
+        shop(["Milk", "Eggs"], daysAgo: 14, at: store)
+        shop(["Milk", "Eggs"], daysAgo: 7, at: store)
+        try service.save()
+        let eggs = try XCTUnwrap(service.item(named: "eggs", in: store))
+        service.skipForNextTrip([eggs], now: now)
+
+        service.setSuggested(eggs, false)
+        XCTAssertNil(eggs.restockSkippedAt)
+        let line = try XCTUnwrap(service.restockLines(in: store, now: now, calendar: calendar)
+            .first { $0.item == eggs })
+        XCTAssertTrue(line.isMuted)
+        XCTAssertFalse(line.isSuggested)
+        XCTAssertEqual(line.shelf, .rest)
+        XCTAssertEqual(service.neededNotOnList(in: store, now: now, calendar: calendar).map(\.item.displayName),
+                       ["Milk"])
+        XCTAssertTrue(service.skippedNotOnList(in: store, now: now, calendar: calendar).isEmpty)
+
+        service.setSuggested(eggs, true)
+        XCTAssertEqual(service.neededNotOnList(in: store, now: now, calendar: calendar).count, 2)
+    }
+
     func testOpenTripsDontCountAsPurchases() throws {
         let store = service.createStore(named: "Costco", now: now)
         let entry = try XCTUnwrap(service.addToList("Milk", store: store, by: jason, now: now))

@@ -27,7 +27,7 @@ struct RestockScreen: View {
     var body: some View {
         let now = Date()
         let lines = service.restockLines(in: store, now: now)
-        let needed = lines.filter { $0.urgency.isNeeded && !$0.isOnList }
+        let needed = lines.filter { $0.isSuggested && !$0.isOnList }
         let rhythm = service.rhythm(of: store)
         VStack(spacing: 10) {
             ScreenHeader(storeName: store.displayName, title: "Restock",
@@ -91,13 +91,34 @@ struct RestockScreen: View {
     }
 
     private func restockRow(_ line: RestockLine, now: Date, showsDivider: Bool) -> some View {
-        let chip = Restock.chip(line.urgency)
-        return ItemRow(name: line.item.displayName,
-                       detail: line.isOnList ? "On the list · \(line.summary(now: now))" : line.summary(now: now),
+        let chip = line.isMuted ? "" : Restock.chip(line.urgency)
+        return ItemRow(name: line.item.displayName, detail: detail(line, now: now),
                        isChecked: line.isOnList, showsDivider: showsDivider,
                        accessory: chip.isEmpty ? nil : AnyView(UrgencyTag(text: chip, late: line.urgency == .overdue)),
                        toggle: { toggleOnList(line.item) })
             .onTapGesture { toggleOnList(line.item) }
+            .contextMenu {
+                if line.isMuted {
+                    Button("Suggest when due", systemImage: "bell") { setSuggested(line.item, true) }
+                } else {
+                    Button("Don't suggest", systemImage: "bell.slash") { setSuggested(line.item, false) }
+                }
+            }
+            .accessibilityAction(named: line.isMuted ? "Suggest when due" : "Don't suggest") {
+                setSuggested(line.item, line.isMuted)
+            }
+    }
+
+    private func detail(_ line: RestockLine, now: Date) -> String {
+        var parts: [String] = []
+        if line.isOnList { parts.append("On the list") }
+        if line.isMuted {
+            parts.append("Not suggested")
+        } else if line.isSkipped && line.urgency.isNeeded {
+            parts.append("Skipped this trip")
+        }
+        parts.append(line.summary(now: now))
+        return parts.joined(separator: " · ")
     }
 
     private func note(for shelf: Restock.Shelf) -> String? {
@@ -105,12 +126,18 @@ struct RestockScreen: View {
         case .needed: return "Due is worked out from how often you buy each thing and when you usually shop."
         case .soon: return "Due the trip after next."
         case .staples: return "Bought on most trips. Not due yet, but worth a look."
-        case .rest: return "Everything else this store remembers."
+        case .rest: return "Everything else this store remembers, and what you've said not to suggest. Hold one to "
+            + "turn suggesting it on or off."
         }
     }
 
     private func toggleOnList(_ item: Item) {
         service.toggleOnList(item, by: profile.shopper)
+        save()
+    }
+
+    private func setSuggested(_ item: Item, _ suggested: Bool) {
+        service.setSuggested(item, suggested)
         save()
     }
 

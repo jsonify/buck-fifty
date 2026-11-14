@@ -65,6 +65,10 @@ public final class Item: NSManagedObject {
     /// How the zone was set: "manual" (by hand, also for "no zone"), or "guessed" by the on-device model (issue #4);
     /// nil when nobody has set or guessed one. See `ZoneSource`.
     @NSManaged public var zoneSource: String?
+    /// Never put up as due before the next trip (Home's cards, Add all, Restock's Add N due), whatever its rhythm says.
+    @NSManaged public var restockMuted: Bool
+    /// When it was skipped for the next trip: it isn't put up as due again until a trip starts after this.
+    @NSManaged public var restockSkippedAt: Date?
     @NSManaged public var createdAt: Date?
     @NSManaged public var store: Store?
     /// The item's zone. Not called `zone`: NSObject already has a `-zone` method (the old NSZone allocator), and a
@@ -196,6 +200,8 @@ public enum ShoppingModel {
             attribute("isWandering", .booleanAttributeType, default: false),
             attribute("wanderOverride", .stringAttributeType),
             attribute("zoneSource", .stringAttributeType),
+            attribute("restockMuted", .booleanAttributeType, default: false),
+            attribute("restockSkippedAt", .dateAttributeType),
             attribute("createdAt", .dateAttributeType),
         ]
         let entry = entity(ListEntry.self, "ListEntry")

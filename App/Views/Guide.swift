@@ -47,7 +47,10 @@ enum Guide {
                 "The list keeps whatever you didn't get last time, so it isn't empty after a trip. Clear it to start "
                     + "fresh; everything stays in the inventory.",
                 "Due before the next trip: a card for each thing you'll run out of. Add puts it on the list; Add all "
-                    + "does them all.",
+                    + "does them all. Clear skips them all for this trip; Bring back undoes it.",
+                "The ⋯ on a card skips just that one for this trip, or stops suggesting it at all. A skipped thing "
+                    + "comes back after the next trip if it's still due. One you've stopped stays on the Restock tab, "
+                    + "where holding it turns suggesting it back on.",
                 "New at says when Buck Fifty has learned enough to switch something on. Coming up shows what it "
                     + "learns next, or your level, as set on the You tab. See Milestones.",
                 "Last 30 days counts this store's trips, the things bought, the average trip and the last one.",
@@ -156,6 +159,9 @@ enum Guide {
                     + "rest.",
                 "Tap a row to tick it onto the list, and again to take it off. Add N due puts everything due on the "
                     + "list. When nothing's left to add, the key opens the list.",
+                "Hold a row for Don't suggest: it's never put up as due (on Home, in Add all or in Add N due) and "
+                    + "moves to Now and then. Hold it again for Suggest when due. Things skipped on Home say Skipped "
+                    + "this trip.",
                 "It needs two purchases of something to know its rhythm. Purchases count by day, so two people "
                     + "splitting up in the store count once.",
             ]),

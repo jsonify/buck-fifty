@@ -8,8 +8,8 @@ import ShoppingStore
 /// The Home tab: your most recent store and its list. The add field, then the LCD for the next trip (how much is on
 /// the list, what's due, the week on its strip with NEXT on the day the next trip probably is), the list you're
 /// building (`HomeListEditor`: Select from inventory, reorder, trash), what's due before the next trip as cards with a
-/// red Add, then milestones and the last month. The orange key, Start trip, is for the store: it sorts the list and
-/// opens it on the List tab.
+/// red Add (Clear and each card's ⋯ skip them for this trip or stop suggesting one), then milestones and the last
+/// month. The orange key, Start trip, is for the store: it sorts the list and opens it on the List tab.
 struct HomeScreen: View {
     @ObservedObject var store: Store
     @Environment(\.managedObjectContext) private var context
@@ -46,6 +46,7 @@ struct HomeScreen: View {
         let now = Date()
         let walk = WalkModel(entries: Array(entries), zones: Array(zones), items: Array(items))
         let low = service.neededNotOnList(in: store, now: now)
+        let skipped = service.skippedNotOnList(in: store, now: now)
         let rhythm = service.rhythm(of: store)
         let milestones = MilestoneBoard.milestones(for: store, context: context, profile: profile, sharing: sharing)
         VStack(spacing: 10) {
@@ -60,7 +61,7 @@ struct HomeScreen: View {
                     VStack(alignment: .leading, spacing: 18) {
                         lcd(walk: walk, due: low.count, rhythm: rhythm, now: now)
                         list(walk)
-                        dueCards(low, now: now)
+                        dueCards(low, skipped: skipped, now: now)
                         newMilestones(milestones)
                         comingUp(milestones).id(Self.comingUpID)
                         lastMonth(now: now)
@@ -150,11 +151,15 @@ struct HomeScreen: View {
 
     // MARK: What's due
 
-    @ViewBuilder private func dueCards(_ low: [RestockLine], now: Date) -> some View {
+    @ViewBuilder private func dueCards(_ low: [RestockLine], skipped: [RestockLine], now: Date) -> some View {
         if !low.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
+                HStack(spacing: 6) {
                     ZoneHeader(title: "Due before the next trip", count: "", state: .next)
+                    Button("Clear") { skip(low.map(\.item), now: now) }
+                        .buttonStyle(.sk1Key(size: .small))
+                        .accessibilityLabel("Clear what's due")
+                        .accessibilityHint("Skips them all for the next trip")
                     if low.count > 1 {
                         Button("Add all \(low.count)") { add(low.map(\.item)) }
                             .buttonStyle(.sk1Key(size: .small))
@@ -163,16 +168,57 @@ struct HomeScreen: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(low, id: \.item.objectID) { line in
-                            DueCard(line: line, now: now) { add([line.item]) }
+                            DueCard(line: line, now: now, add: { add([line.item]) },
+                                    skip: { skip([line.item], now: now) },
+                                    neverSuggest: { neverSuggest(line.item) })
                         }
                     }
                     .padding(.vertical, 3)
                     .padding(.horizontal, 1)
                 }
-                Text("From how often you buy each thing and when you usually shop.")
+                Text(dueHint(skipped: skipped.count))
                     .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
+                if !skipped.isEmpty { bringBack }
+            }
+        } else if !skipped.isEmpty {
+            HStack(spacing: 8) {
+                Text("\(skippedLine(skipped.count)) due before the next trip.")
+                    .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
+                bringBack
             }
         }
+    }
+
+    private func dueHint(skipped: Int) -> String {
+        let from = "From how often you buy each thing and when you usually shop."
+        if skipped == 0 { return from + " The ⋯ on a card skips it this trip or stops suggesting it." }
+        return from + " " + skippedLine(skipped) + " till the next trip."
+    }
+
+    private func skippedLine(_ count: Int) -> String {
+        count == 1 ? "1 skipped" : "\(count) skipped"
+    }
+
+    private var bringBack: some View {
+        Button("Bring back") {
+            service.unskip(in: store)
+            actions.save()
+        }
+        .buttonStyle(.sk1Key(size: .small))
+        .accessibilityHint("Shows what you skipped as due again")
+    }
+
+    private func skip(_ items: [Item], now: Date) {
+        service.skipForNextTrip(items, now: now)
+        actions.save()
+    }
+
+    private func neverSuggest(_ item: Item) {
+        service.setSuggested(item, false)
+        actions.save()
     }
 
     // MARK: Milestones
@@ -303,6 +349,10 @@ struct DueCard: View {
     let line: RestockLine
     let now: Date
     let add: () -> Void
+    /// Not this trip: it comes back after the next one if it's still due.
+    let skip: () -> Void
+    /// Never suggest it: it stays on the Restock tab, where it can be turned back on.
+    let neverSuggest: () -> Void
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -313,8 +363,19 @@ struct DueCard: View {
                 if let every = Restock.describe(interval: line.estimate.interval) {
                     Text(every.lowercased()).font(.system(size: 11, weight: .semibold)).sk1Ink(soft: true)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .minimumScaleFactor(0.7)
                 }
+                Menu {
+                    Button("Skip this trip", systemImage: "forward", action: skip)
+                    Button("Don't suggest \(line.item.displayName)", systemImage: "bell.slash", action: neverSuggest)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 13, weight: .bold))
+                        .sk1Ink(soft: true)
+                        .frame(width: 24, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("More for \(line.item.displayName)")
             }
             Text(line.item.displayName)
                 .font(.system(size: 15, weight: .bold))
