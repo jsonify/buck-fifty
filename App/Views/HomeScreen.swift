@@ -8,7 +8,7 @@ import ShoppingStore
 /// The Home tab: your most recent store and its list. The add field, then the LCD for the next trip (how much is on
 /// the list, what's due, the week on its strip with NEXT on the day the next trip probably is), the list you're
 /// building (`HomeListEditor`: Select from inventory, reorder, trash), what's due before the next trip as cards with a
-/// red Add (Clear and each card's ⋯ skip them for this trip or stop suggesting one), then milestones and the last
+/// red Add (Clear and each card's menu skip them for this trip or stop suggesting one), then milestones and the last
 /// month. The orange key, Start trip, is for the store: it sorts the list and opens it on the List tab.
 struct HomeScreen: View {
     @ObservedObject var store: Store
@@ -194,7 +194,7 @@ struct HomeScreen: View {
 
     private func dueHint(skipped: Int) -> String {
         let from = "From how often you buy each thing and when you usually shop."
-        if skipped == 0 { return from + " The ⋯ on a card skips it this trip or stops suggesting it." }
+        if skipped == 0 { return from + " A card's menu skips it this trip or stops suggesting it." }
         return from + " " + skippedLine(skipped) + " till the next trip."
     }
 
@@ -357,30 +357,34 @@ struct DueCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(alignment: .center, spacing: 4) {
                 UrgencyTag(text: Restock.chip(line.urgency), late: line.urgency == .overdue)
                 Spacer(minLength: 4)
-                if let every = Restock.describe(interval: line.estimate.interval) {
-                    Text(every.lowercased()).font(.system(size: 11, weight: .semibold)).sk1Ink(soft: true)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
                 Menu {
                     Button("Skip this trip", systemImage: "forward", action: skip)
                     Button("Don't suggest \(line.item.displayName)", systemImage: "bell.slash", action: neverSuggest)
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .sk1Ink(soft: true)
-                        .frame(width: 24, height: 20)
+                        .frame(width: 28, height: 20)
                         .contentShape(Rectangle())
                 }
+                .menuIndicator(.hidden)
+                .buttonStyle(.plain)
                 .accessibilityLabel("More for \(line.item.displayName)")
             }
-            Text(line.item.displayName)
-                .font(.system(size: 15, weight: .bold))
-                .lineLimit(1)
-                .sk1Ink()
+            VStack(alignment: .leading, spacing: 1) {
+                Text(line.item.displayName)
+                    .font(.system(size: 15, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .sk1Ink()
+                Text(Restock.describe(interval: line.estimate.interval) ?? " ")
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .sk1Ink(soft: true)
+            }
             Button(action: add) {
                 Text("Add")
                     .font(.system(size: 14, weight: .heavy))

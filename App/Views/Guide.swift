@@ -48,7 +48,7 @@ enum Guide {
                     + "fresh; everything stays in the inventory.",
                 "Due before the next trip: a card for each thing you'll run out of. Add puts it on the list; Add all "
                     + "does them all. Clear skips them all for this trip; Bring back undoes it.",
-                "The ⋯ on a card skips just that one for this trip, or stops suggesting it at all. A skipped thing "
+                "The ⋯ menu on a card skips just that one for this trip, or stops suggesting it at all. A skipped thing "
                     + "comes back after the next trip if it's still due. One you've stopped stays on the Restock tab, "
                     + "where holding it turns suggesting it back on.",
                 "New at says when Buck Fifty has learned enough to switch something on. Coming up shows what it "
